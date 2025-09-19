@@ -2,7 +2,7 @@
 
 ## 概述
 
-ThreadBond 是一款基于线索解密机制的匿名社交移动端 Web 应用。系统采用微服务架构，支持高并发的匿名用户交互，集成 AI 服务提供智能线索生成和情绪分析功能。应用专为移动设备优化，提供原生应用般的用户体验，核心设计理念是在保护用户隐私的前提下，通过创新的解密互动机制促进深度社交连接。
+ThreadBond 是一款创新的匿名线索社交移动端 Web 应用，通过独特的"解密"互动机制让用户能够在保持匿名的同时进行深度社交。系统采用微服务架构，支持高并发的匿名用户交互，集成 AI 服务提供智能线索生成和情绪分析功能。应用专为移动设备优化，提供原生应用般的用户体验，核心设计理念是在保护用户隐私的前提下，通过创新的解密互动机制为年轻用户群体提供更有趣、更走心的社交体验。
 
 ## 架构
 
@@ -30,7 +30,7 @@ graph TB
     end
 
     subgraph "数据层"
-        K[用户数据库 PostgreSQL]
+        K[用户数据库 MySQL]
         L[线索数据库 MongoDB]
         M[聊天数据库 Redis]
         N[文件存储 AWS S3]
@@ -80,11 +80,12 @@ graph TB
 
 **后端：**
 
-- Java 17 + Spring Boot - 微服务框架
-- Spring Security - 安全认证
-- Spring WebSocket - 实时通信
-- MyBatis Plus - ORM 框架
+- Node.js 18+ + Express.js - 微服务框架
+- Passport.js - 安全认证
+- Socket.IO - 实时通信
+- Prisma - ORM 框架
 - JWT - 身份验证
+- TypeScript - 类型安全
 
 **数据库：**
 
@@ -113,21 +114,30 @@ graph TB
 
 **职责：**
 
-- 用户注册和身份验证
-- 匿名身份生成和管理
-- 用户偏好设置
+- 用户注册和身份验证（仅需邮箱验证）
+- 匿名身份自动生成和管理
+- 用户偏好设置和隐私保护
+- 真实身份与匿名身份完全隔离
 
 **主要接口：**
 
-```java
-@RestController
-@RequestMapping("/api/users")
-public class UserController {
-    ResponseEntity<User> registerUser(@RequestBody RegisterRequest request);
-    ResponseEntity<AuthToken> authenticateUser(@RequestBody LoginRequest request);
-    ResponseEntity<AnonymousIdentity> generateAnonymousIdentity(@PathVariable String userId);
-    ResponseEntity<Void> updateUserPreferences(@PathVariable String userId, @RequestBody UserPreferences preferences);
-    ResponseEntity<Void> deleteUser(@PathVariable String userId);
+```typescript
+// /api/users 路由
+class UserController {
+  async registerUser(req: Request, res: Response): Promise<Response<User>>;
+  async authenticateUser(
+    req: Request,
+    res: Response
+  ): Promise<Response<AuthToken>>;
+  async generateAnonymousIdentity(
+    req: Request,
+    res: Response
+  ): Promise<Response<AnonymousIdentity>>;
+  async updateUserPreferences(
+    req: Request,
+    res: Response
+  ): Promise<Response<void>>;
+  async deleteUser(req: Request, res: Response): Promise<Response<void>>;
 }
 ```
 
@@ -135,22 +145,27 @@ public class UserController {
 
 **职责：**
 
-- 线索卡创建和编辑
+- 线索卡创建和编辑（支持文字、图片、音频等多种类型）
 - 线索内容存储和检索
-- 解密逻辑处理
+- 解密逻辑处理和答案验证
+- 解密难度级别设置
+- 线索池管理和发布
+- 解密历史和成功率统计
 
 **主要接口：**
 
-```java
-@RestController
-@RequestMapping("/api/clues")
-public class ClueController {
-    ResponseEntity<Clue> createClue(@RequestBody ClueCreateRequest request);
-    ResponseEntity<Clue> getClueById(@PathVariable String clueId);
-    ResponseEntity<List<Clue>> getCluesForUser(@PathVariable String userId, @RequestParam ClueFilters filters);
-    ResponseEntity<DecryptionResult> attemptDecryption(@RequestBody DecryptionRequest request);
-    ResponseEntity<Clue> updateClue(@PathVariable String clueId, @RequestBody ClueUpdateRequest request);
-    ResponseEntity<Void> deleteClue(@PathVariable String clueId);
+```typescript
+// /api/clues 路由
+class ClueController {
+  async createClue(req: Request, res: Response): Promise<Response<Clue>>;
+  async getClueById(req: Request, res: Response): Promise<Response<Clue>>;
+  async getCluesForUser(req: Request, res: Response): Promise<Response<Clue[]>>;
+  async attemptDecryption(
+    req: Request,
+    res: Response
+  ): Promise<Response<DecryptionResult>>;
+  async updateClue(req: Request, res: Response): Promise<Response<Clue>>;
+  async deleteClue(req: Request, res: Response): Promise<Response<void>>;
 }
 ```
 
@@ -158,21 +173,28 @@ public class ClueController {
 
 **职责：**
 
-- 匿名聊天房间创建
-- 实时消息传递
-- 聊天记录管理
+- 解密成功后自动创建匿名聊天房间
+- 实时消息传递（文字、表情、图片）
+- 聊天记录管理和保存
+- 匿名性保护和身份揭示选项
+- 聊天结束和房间管理
 
 **主要接口：**
 
-```java
-@RestController
-@RequestMapping("/api/chat")
-public class ChatController {
-    ResponseEntity<ChatRoom> createChatRoom(@RequestBody ChatRoomCreateRequest request);
-    ResponseEntity<Void> sendMessage(@RequestBody MessageSendRequest request);
-    ResponseEntity<List<Message>> getChatHistory(@PathVariable String roomId, @RequestParam int limit, @RequestParam int offset);
-    ResponseEntity<Void> endChat(@PathVariable String roomId, @RequestParam String userId);
-    ResponseEntity<Void> revealIdentity(@PathVariable String roomId, @RequestParam String userId);
+```typescript
+// /api/chat 路由
+class ChatController {
+  async createChatRoom(
+    req: Request,
+    res: Response
+  ): Promise<Response<ChatRoom>>;
+  async sendMessage(req: Request, res: Response): Promise<Response<void>>;
+  async getChatHistory(
+    req: Request,
+    res: Response
+  ): Promise<Response<Message[]>>;
+  async endChat(req: Request, res: Response): Promise<Response<void>>;
+  async revealIdentity(req: Request, res: Response): Promise<Response<void>>;
 }
 ```
 
@@ -180,41 +202,108 @@ public class ChatController {
 
 **职责：**
 
-- 线索内容生成
-- 聊天情绪分析
-- 个性化推荐
+- 线索创意建议和内容生成
+- 个性化线索模板生成
+- 聊天情绪分析和建议提供
+- 用户偏好学习和推荐算法优化
+- 隐私保护的AI分析处理
 
 **主要接口：**
 
-```java
-@RestController
-@RequestMapping("/api/ai")
-public class AIController {
-    ResponseEntity<List<ClueIdea>> generateClueIdeas(@RequestBody UserContext userContext);
-    ResponseEntity<ClueAnalysis> analyzeClueContent(@RequestBody String content);
-    ResponseEntity<SentimentAnalysis> analyzeChatSentiment(@RequestBody List<Message> messages);
-    ResponseEntity<List<String>> generateChatSuggestions(@RequestBody ChatContext chatContext);
+```typescript
+// /api/ai 路由
+class AIController {
+  async generateClueIdeas(
+    req: Request,
+    res: Response
+  ): Promise<Response<ClueIdea[]>>; // 根据用户输入提供创意建议
+  async generatePersonalizedTemplate(
+    req: Request,
+    res: Response
+  ): Promise<Response<ClueTemplate>>; // 生成符合用户个性的线索模板
+  async analyzeClueContent(
+    req: Request,
+    res: Response
+  ): Promise<Response<ClueAnalysis>>;
+  async analyzeChatSentiment(
+    req: Request,
+    res: Response
+  ): Promise<Response<SentimentAnalysis>>; // 分析对话情绪
+  async generateChatSuggestions(
+    req: Request,
+    res: Response
+  ): Promise<Response<string[]>>; // 提供聊天建议
+  async optimizeRecommendations(
+    req: Request,
+    res: Response
+  ): Promise<Response<void>>; // 学习用户偏好优化推荐
 }
 ```
 
-#### 5. 推荐引擎组件 (RecommendationService)
+#### 5. 安全管理组件 (SecurityService)
 
 **职责：**
 
-- 线索推荐算法
-- 用户匹配逻辑
-- 内容个性化
+- 用户举报和屏蔽功能
+- 不当内容检测和过滤
+- 数据导出和删除管理
+- 隐私设置和数据保护
+- 安全事件监控和处理
 
 **主要接口：**
 
-```java
-@RestController
-@RequestMapping("/api/recommendations")
-public class RecommendationController {
-    ResponseEntity<List<Clue>> getRecommendedClues(@PathVariable String userId, @RequestParam int limit);
-    ResponseEntity<List<Clue>> getTrendingClues(@RequestParam int limit);
-    ResponseEntity<Void> updateUserInteractionData(@PathVariable String userId, @RequestBody UserInteraction interaction);
-    ResponseEntity<List<FeedItem>> getPersonalizedFeed(@PathVariable String userId);
+```typescript
+// /api/security 路由
+class SecurityController {
+  async reportUser(req: Request, res: Response): Promise<Response<void>>;
+  async blockUser(req: Request, res: Response): Promise<Response<void>>;
+  async requestDataExport(
+    req: Request,
+    res: Response
+  ): Promise<Response<DataExport>>;
+  async deleteUserData(req: Request, res: Response): Promise<Response<void>>;
+  async updatePrivacySettings(
+    req: Request,
+    res: Response
+  ): Promise<Response<void>>;
+  async scanContent(
+    req: Request,
+    res: Response
+  ): Promise<Response<ContentScanResult>>;
+}
+```
+
+#### 6. 推荐引擎组件 (RecommendationService)
+
+**职责：**
+
+- 基于用户兴趣和行为的线索推荐算法
+- 线索分类和搜索功能
+- 热门线索和趋势分析
+- 新老用户曝光平衡算法
+- 个性化内容推荐和用户匹配
+
+**主要接口：**
+
+```typescript
+// /api/recommendations 路由
+class RecommendationController {
+  async getRecommendedClues(
+    req: Request,
+    res: Response
+  ): Promise<Response<Clue[]>>;
+  async getTrendingClues(
+    req: Request,
+    res: Response
+  ): Promise<Response<Clue[]>>;
+  async updateUserInteractionData(
+    req: Request,
+    res: Response
+  ): Promise<Response<void>>;
+  async getPersonalizedFeed(
+    req: Request,
+    res: Response
+  ): Promise<Response<FeedItem[]>>;
 }
 ```
 
@@ -222,45 +311,35 @@ public class RecommendationController {
 
 ### 用户相关模型
 
-```java
-@Entity
-@Table(name = "users")
-public class User {
-    @Id
-    private String id;
-
-    @Column(unique = true, nullable = false)
-    private String email;
-
-    @Column(nullable = false)
-    private String passwordHash;
-
-    @CreationTimestamp
-    private LocalDateTime createdAt;
-
-    private LocalDateTime lastActiveAt;
-
-    @Column(nullable = false)
-    private Boolean isActive = true;
-
-    @OneToOne(cascade = CascadeType.ALL)
-    private UserPreferences preferences;
+```typescript
+// Prisma Schema 定义
+interface User {
+  id: string;
+  email: string; // unique, required - 仅用于验证
+  passwordHash: string; // required
+  createdAt: Date;
+  lastActiveAt?: Date;
+  isActive: boolean; // default: true
+  preferences?: UserPreferences;
+  // 注意：不存储任何可识别的真实身份信息
 }
 
 interface AnonymousIdentity {
-  id: string
-  userId: string
-  displayName: string
-  avatarUrl: string
-  personalityTraits: string[]
-  createdAt: Date
+  id: string;
+  userId: string;
+  displayName: string; // 用户可选择的匿名昵称
+  avatarUrl: string; // 用户可选择的匿名头像
+  personalityTraits: string[];
+  createdAt: Date;
+  isAutoGenerated: boolean; // 标识是否为系统自动生成
 }
 
 interface UserPreferences {
-  clueTypes: ClueType[]
-  difficultyLevel: DifficultyLevel
-  notificationSettings: NotificationSettings
-  privacySettings: PrivacySettings
+  clueTypes: ClueType[]; // 偏好的线索类型
+  difficultyLevel: DifficultyLevel; // 偏好的解密难度
+  notificationSettings: NotificationSettings;
+  privacySettings: PrivacySettings;
+  dataRetentionSettings: DataRetentionSettings; // 数据保留设置
 }
 ```
 
@@ -269,19 +348,20 @@ interface UserPreferences {
 ```typescript
 interface Clue {
   id: string;
-  creatorId: string;
+  creatorId: string; // 关联匿名身份ID
   title: string;
   content: ClueContent;
-  type: ClueType;
-  difficulty: DifficultyLevel;
-  solution: string;
-  hints: string[];
+  type: ClueType; // 文字、图片、音频等
+  difficulty: DifficultyLevel; // 用户设置的难度级别
+  solution: string; // 加密存储的答案
+  hints: string[]; // 提示系统
   createdAt: Date;
   expiresAt?: Date;
-  isActive: boolean;
-  decryptionCount: number;
-  successfulDecryptions: number;
-  tags: string[];
+  isActive: boolean; // 是否在线索池中可见
+  decryptionCount: number; // 总尝试次数
+  successfulDecryptions: number; // 成功解密次数
+  tags: string[]; // 分类标签
+  aiGenerated: boolean; // 是否使用AI辅助生成
 }
 
 interface ClueContent {
@@ -294,12 +374,14 @@ interface ClueContent {
 
 interface DecryptionAttempt {
   id: string;
-  userId: string;
+  userId: string; // 匿名身份ID
   clueId: string;
   answer: string;
   isCorrect: boolean;
   attemptedAt: Date;
   hintsUsed: number;
+  attemptNumber: number; // 第几次尝试（限制尝试次数）
+  chatRoomCreated?: string; // 成功后创建的聊天房间ID
 }
 ```
 
@@ -308,26 +390,30 @@ interface DecryptionAttempt {
 ```typescript
 interface ChatRoom {
   id: string;
-  participant1Id: string;
-  participant2Id: string;
-  clueId: string;
+  participant1Id: string; // 线索创建者匿名ID
+  participant2Id: string; // 解密者匿名ID
+  clueId: string; // 触发聊天的线索ID
   createdAt: Date;
   lastMessageAt: Date;
   isActive: boolean;
-  identityRevealed: boolean;
-  endedBy?: string;
+  identityRevealed: boolean; // 双方是否同意揭示身份
+  identityRevealedBy?: string[]; // 同意揭示身份的用户列表
+  endedBy?: string; // 结束聊天的用户ID
   endedAt?: Date;
+  autoCreated: boolean; // 解密成功后自动创建
 }
 
 interface Message {
   id: string;
   roomId: string;
-  senderId: string;
+  senderId: string; // 匿名身份ID
   content: MessageContent;
-  type: MessageType;
+  type: MessageType; // 文字、表情、图片等
   sentAt: Date;
-  isEncrypted: boolean;
+  isEncrypted: boolean; // 端到端加密
   readAt?: Date;
+  sentimentScore?: number; // AI情绪分析结果
+  isSystemMessage: boolean; // 系统消息标识
 }
 
 interface MessageContent {
@@ -336,7 +422,39 @@ interface MessageContent {
   audioUrl?: string;
   emoji?: string;
   systemMessage?: string;
+  aiSuggestion?: string; // AI生成的聊天建议
 }
+
+### 安全和隐私相关模型
+
+```typescript
+interface DataRetentionSettings {
+  chatHistoryRetentionDays: number; // 聊天记录保留天数
+  clueRetentionDays: number; // 线索保留天数
+  autoDeleteEnabled: boolean; // 是否启用自动删除
+}
+
+interface SecurityReport {
+  userId: string;
+  reportType: ReportType; // 举报类型
+  targetId: string; // 被举报对象ID
+  reason: string;
+  description?: string;
+  reportedAt: Date;
+  status: ReportStatus;
+  reviewedBy?: string;
+  reviewedAt?: Date;
+}
+
+interface UserDataExport {
+  userId: string;
+  requestedAt: Date;
+  exportType: ExportType; // 导出类型（全部数据、聊天记录等）
+  status: ExportStatus;
+  downloadUrl?: string;
+  expiresAt?: Date;
+}
+```
 ```
 
 ## 错误处理
@@ -390,7 +508,7 @@ interface AppError {
 
 - **覆盖率目标：** 90%以上
 - **重点测试：** 业务逻辑、数据验证、加密解密
-- **工具：** JUnit 5 + Mockito + TestContainers
+- **工具：** Jest + Supertest + Docker Compose
 
 #### 2. 集成测试
 
@@ -406,13 +524,12 @@ interface AppError {
 
 ### 测试数据管理
 
-```java
-@Component
-public class TestDataManager {
-    public TestUser createTestUser(TestUserProfile profile);
-    public TestClue createTestClue(DifficultyLevel difficulty);
-    public DecryptionResult simulateDecryptionAttempt(boolean success);
-    public void cleanupTestData();
+```typescript
+class TestDataManager {
+  async createTestUser(profile: TestUserProfile): Promise<TestUser>;
+  async createTestClue(difficulty: DifficultyLevel): Promise<TestClue>;
+  async simulateDecryptionAttempt(success: boolean): Promise<DecryptionResult>;
+  async cleanupTestData(): Promise<void>;
 }
 ```
 
@@ -435,25 +552,28 @@ public class TestDataManager {
 
 #### 2. 匿名性保护
 
-- **身份隔离：** 真实身份与匿名身份完全分离
+- **身份隔离：** 真实身份与匿名身份完全分离，系统确保社交互动中不泄露真实信息
 - **数据脱敏：** 日志和分析数据中移除可识别信息
 - **访问控制：** 基于角色的细粒度权限管理
+- **数据清理：** 定期清理过期聊天记录和个人数据
+- **用户控制：** 提供数据导出和删除选项，遵循隐私法规
 
 #### 3. 内容安全
 
-- **内容过滤：** AI 驱动的不当内容检测
-- **举报机制：** 快速响应的用户举报处理
+- **内容过滤：** AI 驱动的不当内容自动检测和过滤
+- **举报机制：** 快速响应的用户举报和屏蔽功能
 - **审核流程：** 人工审核 + 自动化审核结合
+- **实时监控：** 检测到不当内容时自动警告或过滤
+- **用户保护：** 提供屏蔽和举报功能防止恶意行为
 
 ### 安全监控
 
-```java
-@Service
-public class SecurityMonitor {
-    public ThreatLevel detectSuspiciousActivity(String userId, UserActivity activity);
-    public void trackFailedAttempts(AttemptType type, String identifier);
-    public SecurityReport generateSecurityReport(TimeRange timeRange);
-    public void alertSecurityTeam(SecurityIncident incident);
+```typescript
+class SecurityMonitor {
+  detectSuspiciousActivity(userId: string, activity: UserActivity): ThreatLevel;
+  trackFailedAttempts(type: AttemptType, identifier: string): void;
+  generateSecurityReport(timeRange: TimeRange): SecurityReport;
+  alertSecurityTeam(incident: SecurityIncident): void;
 }
 ```
 
@@ -473,6 +593,6 @@ public class SecurityMonitor {
 
 ### 实时通信优化
 
-- **WebSocket 管理：** Spring WebSocket + STOMP 协议
-- **消息队列：** Redis Pub/Sub + RabbitMQ 消息持久化
-- **负载均衡：** Nginx + Spring Cloud Gateway
+- **WebSocket 管理：** Socket.IO + Redis Adapter
+- **消息队列：** Redis Pub/Sub + Bull Queue 消息持久化
+- **负载均衡：** Nginx + PM2 集群模式
