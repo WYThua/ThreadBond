@@ -1,0 +1,20 @@
+{
+  "name": "threadbond-app",
+  "version": "1.0.0",
+  "description": "ThreadBond - 创新的匿名线索社交应用",
+  "main": "index.js",
+  "scripts": {
+    "dev": "docker-compose up --build",
+    "dev:backend": "docker-compose up backend",
+    "dev:frontend": "docker-compose up frontend",
+    "build": "docker-compose build",
+    "stop": "docker-compose down",
+    "clean": "docker-compose down -v --rmi all"
+  },
+  "keywords": ["social", "anonymous", "chat", "mobile", "pwa"],
+  "author": "ThreadBond Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

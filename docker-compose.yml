@@ -1,0 +1,86 @@
+# Docker Compose 配置文件
+
+services:
+  # MySQL 数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: threadbond-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: threadbond_root_2024
+      MYSQL_DATABASE: threadbond_db
+      MYSQL_USER: threadbond_user
+      MYSQL_PASSWORD: threadbond_pass_2024
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - threadbond-network
+
+  # Redis 缓存服务
+  redis:
+    image: redis:7-alpine
+    container_name: threadbond-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - threadbond-network
+
+  # 后端 Node.js 服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: threadbond-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: mysql://threadbond_user:threadbond_pass_2024@mysql:3306/threadbond_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: threadbond_jwt_secret_key_2024_very_secure
+      PORT: 3000
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - threadbond-network
+    command: npm run dev
+
+  # 前端 Vue.js 服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: threadbond-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: development
+      VUE_APP_API_BASE_URL: http://localhost:3000/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - threadbond-network
+    command: npm run serve
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  threadbond-network:
+    driver: bridge
