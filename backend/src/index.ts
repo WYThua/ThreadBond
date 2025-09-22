@@ -7,21 +7,21 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 
-import { errorHandler } from '@/middleware/errorHandler';
-import { rateLimiter } from '@/middleware/rateLimiter';
-import { authMiddleware } from '@/middleware/auth';
-import { setupPassport } from '@/config/passport';
-import { connectRedis } from '@/config/redis';
-import { setupSocketIO } from '@/config/socket';
+import { errorHandler } from './middleware/errorHandler';
+import { rateLimiter } from './middleware/rateLimiter';
+import { authMiddleware } from './middleware/auth';
+import { setupPassport } from './config/passport';
+import { connectRedis } from './config/redis';
+import { setupSocketIO } from './config/socket';
 
 // 导入路由
-import authRoutes from '@/routes/auth';
-import userRoutes from '@/routes/users';
-import clueRoutes from '@/routes/clues';
-import chatRoutes from '@/routes/chat';
-import aiRoutes from '@/routes/ai';
-import securityRoutes from '@/routes/security';
-import recommendationRoutes from '@/routes/recommendations';
+import authRoutes from './routes/auth';
+import userRoutes from './routes/users';
+import clueRoutes from './routes/clues';
+import chatRoutes from './routes/chat';
+import aiRoutes from './routes/ai';
+import securityRoutes from './routes/security';
+import recommendationRoutes from './routes/recommendations';
 
 // 加载环境变量
 dotenv.config();
@@ -63,6 +63,24 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/recommendations', recommendationRoutes);
+
+// 根路径欢迎页面
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'ThreadBond API 服务正在运行',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth',
+      users: '/api/users',
+      clues: '/api/clues',
+      chat: '/api/chat'
+    },
+    frontend: process.env.FRONTEND_URL || 'http://localhost:8080',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // 健康检查端点
 app.get('/health', (req, res) => {
@@ -129,4 +147,8 @@ process.on('SIGINT', () => {
 });
 
 // 启动服务
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+export default app;

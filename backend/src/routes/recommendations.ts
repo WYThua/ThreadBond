@@ -1,32 +1,23 @@
 import { Router } from 'express';
-import { requireAuth, optionalAuth } from '@/middleware/auth';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
 // 获取推荐线索
-router.get('/clues', optionalAuth, (req, res) => {
+router.get('/clues', requireAuth, (req, res) => {
   res.json({
     success: true,
-    message: '推荐线索获取功能待实现',
-    data: null
+    message: '推荐线索功能待实现',
+    data: []
   });
 });
 
 // 获取热门线索
-router.get('/trending', (req, res) => {
+router.get('/trending', requireAuth, (req, res) => {
   res.json({
     success: true,
-    message: '热门线索获取功能待实现',
-    data: null
-  });
-});
-
-// 更新用户交互数据
-router.post('/interaction', requireAuth, (req, res) => {
-  res.json({
-    success: true,
-    message: '用户交互数据更新功能待实现',
-    data: null
+    message: '热门线索功能待实现',
+    data: []
   });
 });
 
@@ -34,8 +25,8 @@ router.post('/interaction', requireAuth, (req, res) => {
 router.get('/personalized', requireAuth, (req, res) => {
   res.json({
     success: true,
-    message: '个性化推荐获取功能待实现',
-    data: null
+    message: '个性化推荐功能待实现',
+    data: []
   });
 });
 

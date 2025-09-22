@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { requireAuth } from '@/middleware/auth';
-import { aiServiceLimiter } from '@/middleware/rateLimiter';
+import { requireAuth } from '../middleware/auth';
+import { aiServiceLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 

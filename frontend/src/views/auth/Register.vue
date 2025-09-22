@@ -35,10 +35,10 @@
           type="password"
           name="password"
           label="密码"
-          placeholder="请输入密码（至少6位）"
+          placeholder="请输入密码（至少8位，包含大小写字母、数字和特殊字符）"
           :rules="[
             { required: true, message: '请输入密码' },
-            { min: 6, message: '密码至少6位' },
+            { min: 8, message: '密码至少8位' },
             { validator: validatePassword }
           ]"
           left-icon="lock"
@@ -181,7 +181,7 @@ export default {
              this.form.confirmPassword && 
              this.form.agreeTerms &&
              this.form.password === this.form.confirmPassword &&
-             this.form.password.length >= 6;
+             this.passwordStrength >= 4; // 要求密码强度至少为"很强"
     },
 
     // 密码强度
@@ -192,7 +192,6 @@ export default {
       let strength = 0;
       
       // 长度检查
-      if (password.length >= 6) strength += 1;
       if (password.length >= 8) strength += 1;
       
       // 复杂度检查
@@ -230,9 +229,30 @@ export default {
 
     // 验证密码
     validatePassword(value) {
-      if (value.length < 6) {
-        return '密码至少6位';
+      if (value.length < 8) {
+        return '密码至少8位';
       }
+      
+      // 检查是否包含大写字母
+      if (!/[A-Z]/.test(value)) {
+        return '密码必须包含大写字母';
+      }
+      
+      // 检查是否包含小写字母
+      if (!/[a-z]/.test(value)) {
+        return '密码必须包含小写字母';
+      }
+      
+      // 检查是否包含数字
+      if (!/\d/.test(value)) {
+        return '密码必须包含数字';
+      }
+      
+      // 检查是否包含特殊字符
+      if (!/[@$!%*?&]/.test(value)) {
+        return '密码必须包含特殊字符(@$!%*?&)';
+      }
+      
       return true;
     },
 
@@ -253,8 +273,9 @@ export default {
         });
 
         if (result.success) {
-          this.$toast.success('注册成功，请登录');
-          this.$router.push('/login');
+          this.$toast.success('注册成功！');
+          // 注册成功后直接跳转到首页（因为已经自动登录）
+          this.$router.push('/home');
         } else {
           this.$toast.fail(result.message || '注册失败');
         }

@@ -1,3 +1,5 @@
+import { authAPI } from '@/api/auth';
+
 // 认证状态管理
 const state = {
   // 认证状态
@@ -68,16 +70,12 @@ const actions = {
   async checkAuthStatus({ commit, state }) {
     if (state.token) {
       try {
-        // 这里应该调用 API 验证令牌有效性
-        // const response = await api.verifyToken();
-        // if (response.success) {
-        //   commit('SET_AUTHENTICATED', true);
-        // } else {
-        //   commit('CLEAR_AUTH');
-        // }
-        
-        // 暂时简单检查令牌是否存在
-        commit('SET_AUTHENTICATED', true);
+        const response = await authAPI.verifyToken();
+        if (response.success) {
+          commit('SET_AUTHENTICATED', true);
+        } else {
+          commit('CLEAR_AUTH');
+        }
       } catch (error) {
         console.error('认证状态检查失败:', error);
         commit('CLEAR_AUTH');
@@ -92,24 +90,20 @@ const actions = {
     commit('SET_LOGIN_LOADING', true);
     
     try {
-      // 这里应该调用登录 API
-      // const response = await api.login(credentials);
-      // 
-      // if (response.success) {
-      //   commit('SET_TOKEN', response.data.token);
-      //   commit('SET_REFRESH_TOKEN', response.data.refreshToken);
-      //   commit('SET_AUTHENTICATED', true);
-      //   return { success: true, data: response.data };
-      // } else {
-      //   return { success: false, message: response.message };
-      // }
+      const response = await authAPI.login(credentials);
       
-      // 暂时模拟登录成功
-      const mockToken = 'mock-jwt-token-' + Date.now();
-      commit('SET_TOKEN', mockToken);
-      commit('SET_AUTHENTICATED', true);
-      
-      return { success: true, message: '登录成功' };
+      if (response.success) {
+        commit('SET_TOKEN', response.data.token);
+        commit('SET_AUTHENTICATED', true);
+        
+        // 存储用户信息到用户模块
+        commit('user/SET_USER_INFO', response.data.user, { root: true });
+        commit('user/SET_ANONYMOUS_IDENTITY', response.data.anonymousIdentity, { root: true });
+        
+        return { success: true, data: response.data, message: response.message };
+      } else {
+        return { success: false, message: response.message };
+      }
       
     } catch (error) {
       console.error('登录失败:', error);
@@ -124,17 +118,21 @@ const actions = {
     commit('SET_REGISTER_LOADING', true);
     
     try {
-      // 这里应该调用注册 API
-      // const response = await api.register(userData);
-      // 
-      // if (response.success) {
-      //   return { success: true, message: response.message };
-      // } else {
-      //   return { success: false, message: response.message };
-      // }
+      const response = await authAPI.register(userData);
       
-      // 暂时模拟注册成功
-      return { success: true, message: '注册成功，请登录' };
+      if (response.success) {
+        // 注册成功后自动登录
+        commit('SET_TOKEN', response.data.token);
+        commit('SET_AUTHENTICATED', true);
+        
+        // 存储用户信息到用户模块
+        commit('user/SET_USER_INFO', response.data.user, { root: true });
+        commit('user/SET_ANONYMOUS_IDENTITY', response.data.anonymousIdentity, { root: true });
+        
+        return { success: true, data: response.data, message: response.message };
+      } else {
+        return { success: false, message: response.message };
+      }
       
     } catch (error) {
       console.error('注册失败:', error);
@@ -147,8 +145,7 @@ const actions = {
   // 用户登出
   async logout({ commit }) {
     try {
-      // 这里应该调用登出 API
-      // await api.logout();
+      await authAPI.logout();
       
       commit('CLEAR_AUTH');
       
@@ -174,27 +171,34 @@ const actions = {
     }
     
     try {
-      // 这里应该调用刷新令牌 API
-      // const response = await api.refreshToken(state.refreshToken);
-      // 
-      // if (response.success) {
-      //   commit('SET_TOKEN', response.data.token);
-      //   commit('SET_REFRESH_TOKEN', response.data.refreshToken);
-      //   return { success: true };
-      // } else {
-      //   commit('CLEAR_AUTH');
-      //   return { success: false, message: response.message };
-      // }
+      const response = await authAPI.refreshToken();
       
-      // 暂时模拟刷新成功
-      const newToken = 'refreshed-jwt-token-' + Date.now();
-      commit('SET_TOKEN', newToken);
-      return { success: true };
+      if (response.success) {
+        commit('SET_TOKEN', response.data.token);
+        if (response.data.refreshToken) {
+          commit('SET_REFRESH_TOKEN', response.data.refreshToken);
+        }
+        return { success: true };
+      } else {
+        commit('CLEAR_AUTH');
+        return { success: false, message: response.message };
+      }
       
     } catch (error) {
       console.error('令牌刷新失败:', error);
       commit('CLEAR_AUTH');
       return { success: false, message: error.message || '令牌刷新失败' };
+    }
+  },
+
+  // 检查邮箱是否可用
+  async checkEmailAvailability({ commit }, email) {
+    try {
+      const response = await authAPI.checkEmail(email);
+      return response;
+    } catch (error) {
+      console.error('邮箱检查失败:', error);
+      return { success: false, message: error.message || '邮箱检查失败' };
     }
   }
 };

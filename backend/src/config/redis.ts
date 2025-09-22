@@ -38,7 +38,9 @@ export function getRedisClient() {
 
 // Redis 工具函数
 export class RedisService {
-  private client = getRedisClient();
+  private get client() {
+    return getRedisClient();
+  }
 
   // 设置缓存
   async set(key: string, value: any, expireInSeconds?: number): Promise<void> {
@@ -109,6 +111,11 @@ export class RedisService {
     return values.map(v => JSON.parse(v));
   }
 
+  async lPop<T>(key: string): Promise<T | null> {
+    const value = await this.client.lPop(key);
+    return value ? JSON.parse(value) : null;
+  }
+
   // 发布订阅
   async publish(channel: string, message: any): Promise<void> {
     await this.client.publish(channel, JSON.stringify(message));
@@ -122,4 +129,12 @@ export class RedisService {
   }
 }
 
-export const redisService = new RedisService();
+// 延迟初始化 Redis 服务
+let redisServiceInstance: RedisService | null = null;
+
+export function getRedisService(): RedisService {
+  if (!redisServiceInstance) {
+    redisServiceInstance = new RedisService();
+  }
+  return redisServiceInstance;
+}

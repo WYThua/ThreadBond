@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
-import { redisService } from './redis';
+import { getRedisService } from './redis';
 
 const prisma = new PrismaClient();
 
@@ -90,7 +90,7 @@ async function handleUserOnline(socket: AuthenticatedSocket) {
   if (!socket.userId) return;
 
   // 更新用户在线状态
-  await redisService.set(`user:online:${socket.userId}`, {
+  await getRedisService().set(`user:online:${socket.userId}`, {
     socketId: socket.id,
     connectedAt: new Date().toISOString()
   }, 3600); // 1小时过期
@@ -107,7 +107,7 @@ async function handleUserOffline(socket: AuthenticatedSocket) {
   if (!socket.userId) return;
 
   // 移除在线状态
-  await redisService.del(`user:online:${socket.userId}`);
+  await getRedisService().del(`user:online:${socket.userId}`);
 
   // 通知相关用户
   socket.broadcast.emit('user_offline', {
@@ -142,7 +142,7 @@ async function handleJoinChatRoom(socket: AuthenticatedSocket, data: { roomId: s
     socket.join(roomId);
 
     // 缓存用户当前房间
-    await redisService.set(`user:current_room:${socket.userId}`, roomId, 3600);
+    await getRedisService().set(`user:current_room:${socket.userId}`, roomId, 3600);
 
     // 通知房间内其他用户
     socket.to(roomId).emit('user_joined_room', {
@@ -202,14 +202,14 @@ async function handleSendMessage(socket: AuthenticatedSocket, io: Server, data: 
     });
 
     // 缓存最新消息
-    await redisService.lPush(`room:messages:${roomId}`, message);
+    await getRedisService().lPush(`room:messages:${roomId}`, message);
     
     // 只保留最近100条消息在缓存中
-    const messageCount = await redisService.lRange(`room:messages:${roomId}`, 0, -1);
+    const messageCount = await getRedisService().lRange(`room:messages:${roomId}`, 0, -1);
     if (messageCount.length > 100) {
       // 移除多余的消息
       for (let i = 100; i < messageCount.length; i++) {
-        await redisService.lPop(`room:messages:${roomId}`);
+        await getRedisService().lPop(`room:messages:${roomId}`);
       }
     }
 
@@ -238,7 +238,7 @@ async function handleLeaveChatRoom(socket: AuthenticatedSocket, data: { roomId: 
   socket.leave(roomId);
 
   // 清除当前房间缓存
-  await redisService.del(`user:current_room:${socket.userId}`);
+  await getRedisService().del(`user:current_room:${socket.userId}`);
 
   // 通知房间内其他用户
   socket.to(roomId).emit('user_left_room', {

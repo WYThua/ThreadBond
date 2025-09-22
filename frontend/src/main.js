@@ -43,10 +43,10 @@ import {
   Divider,
   Empty,
   Skeleton,
-  BackTop,
   Search,
   DropdownMenu,
-  DropdownItem
+  DropdownItem,
+  Checkbox
 } from 'vant';
 
 // 注册 Vant 组件
@@ -88,10 +88,10 @@ Vue.use(CountDown);
 Vue.use(Divider);
 Vue.use(Empty);
 Vue.use(Skeleton);
-Vue.use(BackTop);
 Vue.use(Search);
 Vue.use(DropdownMenu);
 Vue.use(DropdownItem);
+Vue.use(Checkbox);
 
 // 全局样式
 import './styles/index.scss';

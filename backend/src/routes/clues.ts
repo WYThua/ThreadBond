@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { requireAuth } from '@/middleware/auth';
-import { clueCreationLimiter, decryptionLimiter } from '@/middleware/rateLimiter';
+import { requireAuth } from '../middleware/auth';
+import { clueCreationLimiter, decryptionLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
