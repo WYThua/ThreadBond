@@ -11,15 +11,18 @@ inclusion: always
 ### 包括但不限于：
 
 1. **Node.js 后端应用**
+
    - 不允许使用 `npm run dev` 在本地启动
    - 不允许使用 `node` 命令直接运行后端代码
    - 必须通过 Docker Compose 启动
 
 2. **数据库服务**
+
    - MySQL 必须在 Docker 容器中运行
    - 不允许在本地安装和运行 MySQL
 
 3. **缓存服务**
+
    - Redis 必须在 Docker 容器中运行
    - 不允许在本地安装和运行 Redis
 
@@ -30,11 +33,13 @@ inclusion: always
 ### 允许的运行方式：
 
 1. **完整 Docker 启动**
+
    ```bash
    docker-compose up --build
    ```
 
 2. **仅后端服务启动**
+
    ```bash
    docker-compose up --build mysql redis backend
    ```
@@ -60,6 +65,7 @@ inclusion: always
 ### 违规检查：
 
 任何尝试在本地运行后端服务的操作都应该被阻止或警告，包括：
+
 - `cd backend && npm run dev`
 - `node backend/src/index.js`
 - 本地安装 MySQL/Redis
