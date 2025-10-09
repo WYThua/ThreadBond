@@ -57,6 +57,12 @@ const mutations = {
     state.currentRoute = route;
   },
   
+  // 别名 mutation，兼容错误的调用
+  setCurrentRoute(state, route) {
+    console.warn('使用了已废弃的 mutation 名称 setCurrentRoute，请使用 SET_CURRENT_ROUTE');
+    state.currentRoute = route;
+  },
+  
   // 设置 PWA 安装提示
   SET_INSTALL_PROMPT(state, prompt) {
     state.installPrompt = prompt;

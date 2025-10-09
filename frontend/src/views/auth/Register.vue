@@ -1,106 +1,142 @@
 <template>
   <div class="register-page">
     <van-nav-bar
-      title="注册"
+      title="创建账号"
       left-text="返回"
       left-arrow
       @click-left="$router.go(-1)"
+      fixed
+      placeholder
     />
 
     <div class="register-content">
-      <!-- Logo 区域 -->
-      <div class="logo-section">
-        <van-icon name="chat-o" size="60" color="#1989fa" />
-        <h2>加入 ThreadBond</h2>
-        <p>创建您的匿名社交账号</p>
+      <!-- 头部区域 -->
+      <div class="header-section">
+        <div class="logo-container">
+          <div class="logo-bg">
+            <van-icon name="user-circle-o" size="32" color="#1989fa" />
+          </div>
+        </div>
+        <h2 class="page-title">加入 ThreadBond</h2>
+        <p class="page-subtitle">创建您的匿名社交账号，开启神秘之旅</p>
       </div>
 
       <!-- 注册表单 -->
-      <van-form @submit="handleRegister" class="register-form">
-        <van-field
-          v-model="form.email"
-          name="email"
-          label="邮箱"
-          placeholder="请输入邮箱地址"
-          :rules="[
-            { required: true, message: '请输入邮箱地址' },
-            { pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: '邮箱格式不正确' }
-          ]"
-          left-icon="envelop-o"
-          clearable
-        />
+      <div class="form-container">
+        <van-form @submit="handleRegister" class="register-form">
+          <div class="form-section">
+            <h3 class="section-title">账号信息</h3>
+            
+            <van-field
+              v-model="form.email"
+              name="email"
+              placeholder="请输入邮箱地址"
+              :rules="[
+                { required: true, message: '请输入邮箱地址' },
+                { pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: '邮箱格式不正确' }
+              ]"
+              left-icon="envelop-o"
+              clearable
+              :border="false"
+              class="custom-field"
+            />
 
-        <van-field
-          v-model="form.password"
-          type="password"
-          name="password"
-          label="密码"
-          placeholder="请输入密码（至少8位，包含大小写字母、数字和特殊字符）"
-          :rules="[
-            { required: true, message: '请输入密码' },
-            { min: 8, message: '密码至少8位' },
-            { validator: validatePassword }
-          ]"
-          left-icon="lock"
-          clearable
-        />
+            <van-field
+              v-model="form.password"
+              type="password"
+              name="password"
+              placeholder="设置登录密码"
+              :rules="[
+                { required: true, message: '请输入密码' },
+                { min: 6, message: '密码至少6位' },
+                { validator: validatePassword }
+              ]"
+              left-icon="lock"
+              clearable
+              :border="false"
+              class="custom-field"
+            />
 
-        <van-field
-          v-model="form.confirmPassword"
-          type="password"
-          name="confirmPassword"
-          label="确认密码"
-          placeholder="请再次输入密码"
-          :rules="[
-            { required: true, message: '请确认密码' },
-            { validator: validateConfirmPassword }
-          ]"
-          left-icon="lock"
-          clearable
-        />
+            <van-field
+              v-model="form.confirmPassword"
+              type="password"
+              name="confirmPassword"
+              placeholder="再次确认密码"
+              :rules="[
+                { required: true, message: '请确认密码' },
+                { validator: validateConfirmPassword }
+              ]"
+              left-icon="lock"
+              clearable
+              :border="false"
+              class="custom-field"
+            />
 
-        <!-- 密码强度指示器 -->
-        <div class="password-strength" v-if="form.password">
-          <div class="strength-label">密码强度：</div>
-          <div class="strength-bar">
-            <div 
-              class="strength-fill" 
-              :class="passwordStrengthClass"
-              :style="{ width: passwordStrengthWidth }"
-            ></div>
+            <!-- 密码强度指示器 -->
+            <div class="password-strength" v-if="form.password">
+              <div class="strength-header">
+                <span class="strength-label">密码强度</span>
+                <span class="strength-text" :class="passwordStrengthClass">
+                  {{ passwordStrengthText }}
+                </span>
+              </div>
+              <div class="strength-bar">
+                <div 
+                  class="strength-fill" 
+                  :class="passwordStrengthClass"
+                  :style="{ width: passwordStrengthWidth }"
+                ></div>
+              </div>
+              <div class="strength-tips">
+                <van-icon name="info-o" size="12" color="#969799" />
+                <span>密码至少6位，建议包含字母、数字和特殊字符以提高安全性</span>
+              </div>
+            </div>
           </div>
-          <div class="strength-text" :class="passwordStrengthClass">
-            {{ passwordStrengthText }}
+
+          <!-- 服务条款 -->
+          <div class="terms-section">
+            <van-checkbox 
+              v-model="form.agreeTerms" 
+              :rules="[{ required: true, message: '请同意服务条款' }]"
+              icon-size="16px"
+            >
+              <span class="terms-text">
+                我已阅读并同意
+                <span class="terms-link" @click="showTerms">《服务条款》</span>
+                和
+                <span class="terms-link" @click="showPrivacy">《隐私政策》</span>
+              </span>
+            </van-checkbox>
           </div>
+
+          <van-button
+            type="primary"
+            size="large"
+            block
+            round
+            native-type="submit"
+            :loading="isRegistering"
+            :disabled="!canSubmit"
+            class="register-button"
+          >
+            {{ isRegistering ? '创建中...' : '创建账号' }}
+          </van-button>
+        </van-form>
+
+        <!-- 登录链接 -->
+        <div class="login-link">
+          <span class="login-text">已有账号？</span>
+          <van-button 
+            type="default" 
+            size="small" 
+            plain 
+            @click="goToLogin"
+            class="login-btn"
+          >
+            立即登录
+          </van-button>
         </div>
-
-        <!-- 服务条款 -->
-        <div class="terms-section">
-          <van-checkbox v-model="form.agreeTerms" :rules="[{ required: true, message: '请同意服务条款' }]">
-            我已阅读并同意
-            <span class="terms-link" @click="showTerms">《服务条款》</span>
-            和
-            <span class="terms-link" @click="showPrivacy">《隐私政策》</span>
-          </van-checkbox>
-        </div>
-
-        <van-button
-          type="primary"
-          size="large"
-          block
-          native-type="submit"
-          :loading="isRegistering"
-          :disabled="!canSubmit"
-          class="register-button"
-        >
-          注册
-        </van-button>
-      </van-form>
-
-      <!-- 登录链接 -->
-      <div class="login-link">
-        <span>已有账号？</span>
-        <span class="link" @click="goToLogin">立即登录</span>
       </div>
     </div>
 
@@ -113,16 +149,30 @@
       class="terms-popup"
     >
       <div class="popup-content">
-        <h3>服务条款</h3>
-        <div class="terms-content">
-          <p>1. 用户应遵守相关法律法规，不得发布违法违规内容。</p>
-          <p>2. 平台保护用户隐私，采用匿名机制保障用户信息安全。</p>
-          <p>3. 用户应文明使用平台，不得恶意骚扰他人。</p>
-          <p>4. 平台有权对违规行为进行处理。</p>
-          <p>5. 最终解释权归 ThreadBond 所有。</p>
+        <div class="popup-header">
+          <van-icon name="description" size="24" color="#1989fa" />
+          <h3>服务条款</h3>
         </div>
-        <van-button type="primary" size="small" @click="showTermsPopup = false">
-          我知道了
+        <div class="terms-content">
+          <div class="term-item">
+            <h4>1. 用户行为规范</h4>
+            <p>用户应遵守相关法律法规，不得发布违法违规内容，维护良好的社区环境。</p>
+          </div>
+          <div class="term-item">
+            <h4>2. 隐私保护</h4>
+            <p>平台采用匿名机制保障用户信息安全，保护用户隐私不被泄露。</p>
+          </div>
+          <div class="term-item">
+            <h4>3. 文明使用</h4>
+            <p>用户应文明使用平台功能，不得恶意骚扰他人或进行不当行为。</p>
+          </div>
+          <div class="term-item">
+            <h4>4. 平台权利</h4>
+            <p>平台有权对违规行为进行处理，包括但不限于警告、限制或封禁账号。</p>
+          </div>
+        </div>
+        <van-button type="primary" block round @click="showTermsPopup = false">
+          我已了解
         </van-button>
       </div>
     </van-popup>
@@ -136,16 +186,30 @@
       class="privacy-popup"
     >
       <div class="popup-content">
-        <h3>隐私政策</h3>
-        <div class="privacy-content">
-          <p>1. 我们仅收集必要的用户信息（邮箱用于验证）。</p>
-          <p>2. 用户的真实身份信息不会被存储或泄露。</p>
-          <p>3. 聊天内容采用端到端加密保护。</p>
-          <p>4. 用户可随时删除自己的数据。</p>
-          <p>5. 我们不会将用户信息用于商业用途。</p>
+        <div class="popup-header">
+          <van-icon name="shield-o" size="24" color="#07c160" />
+          <h3>隐私政策</h3>
         </div>
-        <van-button type="primary" size="small" @click="showPrivacyPopup = false">
-          我知道了
+        <div class="privacy-content">
+          <div class="privacy-item">
+            <h4>信息收集</h4>
+            <p>我们仅收集必要的用户信息（邮箱用于验证），不会收集其他个人敏感信息。</p>
+          </div>
+          <div class="privacy-item">
+            <h4>身份保护</h4>
+            <p>用户的真实身份信息不会被存储或泄露，所有社交活动均为匿名进行。</p>
+          </div>
+          <div class="privacy-item">
+            <h4>通信加密</h4>
+            <p>聊天内容采用端到端加密保护，确保通信内容的私密性和安全性。</p>
+          </div>
+          <div class="privacy-item">
+            <h4>数据控制</h4>
+            <p>用户可随时删除自己的数据，我们不会将用户信息用于商业用途。</p>
+          </div>
+        </div>
+        <van-button type="primary" block round @click="showPrivacyPopup = false">
+          我已了解
         </van-button>
       </div>
     </van-popup>
@@ -181,7 +245,7 @@ export default {
              this.form.confirmPassword && 
              this.form.agreeTerms &&
              this.form.password === this.form.confirmPassword &&
-             this.passwordStrength >= 4; // 要求密码强度至少为"很强"
+             this.form.password.length >= 6; // 只要密码长度大于等于6位即可
     },
 
     // 密码强度
@@ -191,16 +255,17 @@ export default {
 
       let strength = 0;
       
-      // 长度检查
+      // 基础长度检查
+      if (password.length >= 6) strength += 1;
       if (password.length >= 8) strength += 1;
       
-      // 复杂度检查
+      // 复杂度检查（可选加分项）
       if (/[a-z]/.test(password)) strength += 1;
       if (/[A-Z]/.test(password)) strength += 1;
       if (/[0-9]/.test(password)) strength += 1;
       if (/[^A-Za-z0-9]/.test(password)) strength += 1;
 
-      return Math.min(strength, 4);
+      return Math.min(strength, 5);
     },
 
     passwordStrengthClass() {
@@ -208,11 +273,12 @@ export default {
       if (strength <= 1) return 'weak';
       if (strength <= 2) return 'medium';
       if (strength <= 3) return 'strong';
-      return 'very-strong';
+      if (strength <= 4) return 'very-strong';
+      return 'excellent';
     },
 
     passwordStrengthWidth() {
-      return (this.passwordStrength / 4) * 100 + '%';
+      return (this.passwordStrength / 5) * 100 + '%';
     },
 
     passwordStrengthText() {
@@ -220,7 +286,8 @@ export default {
       if (strength <= 1) return '弱';
       if (strength <= 2) return '中等';
       if (strength <= 3) return '强';
-      return '很强';
+      if (strength <= 4) return '很强';
+      return '极强';
     }
   },
 
@@ -229,28 +296,8 @@ export default {
 
     // 验证密码
     validatePassword(value) {
-      if (value.length < 8) {
-        return '密码至少8位';
-      }
-      
-      // 检查是否包含大写字母
-      if (!/[A-Z]/.test(value)) {
-        return '密码必须包含大写字母';
-      }
-      
-      // 检查是否包含小写字母
-      if (!/[a-z]/.test(value)) {
-        return '密码必须包含小写字母';
-      }
-      
-      // 检查是否包含数字
-      if (!/\d/.test(value)) {
-        return '密码必须包含数字';
-      }
-      
-      // 检查是否包含特殊字符
-      if (!/[@$!%*?&]/.test(value)) {
-        return '密码必须包含特殊字符(@$!%*?&)';
+      if (value.length < 6) {
+        return '密码至少6位';
       }
       
       return true;
@@ -313,107 +360,164 @@ export default {
 <style lang="scss" scoped>
 .register-page {
   min-height: 100vh;
-  background-color: #f7f8fa;
+  background: linear-gradient(180deg, #f7f8fa 0%, #ffffff 100%);
 }
 
 .register-content {
-  padding: 20px;
+  padding: 0 20px 20px;
 }
 
-.logo-section {
+.header-section {
   text-align: center;
-  padding: 30px 0;
+  padding: 32px 0 40px;
 
-  h2 {
-    margin: 16px 0 8px;
-    color: #323233;
-    font-size: 24px;
-    font-weight: 500;
+  .logo-container {
+    margin-bottom: 20px;
+    
+    .logo-bg {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #1989fa 0%, #1976d2 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      box-shadow: 0 4px 12px rgba(25, 137, 250, 0.3);
+    }
   }
 
-  p {
-    color: #969799;
-    font-size: 14px;
+  .page-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #323233;
+    margin: 0 0 8px;
+    letter-spacing: -0.5px;
+  }
+
+  .page-subtitle {
+    font-size: 15px;
+    color: #646566;
     margin: 0;
+    line-height: 1.4;
   }
 }
 
-.register-form {
-  margin-bottom: 30px;
+.form-container {
+  .form-section {
+    margin-bottom: 24px;
 
-  .van-field {
-    margin-bottom: 16px;
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #323233;
+      margin: 0 0 16px;
+      padding-left: 4px;
+    }
+  }
+
+  .custom-field {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid #f0f0f0;
+    
+    &:focus-within {
+      border-color: #1989fa;
+      box-shadow: 0 2px 8px rgba(25, 137, 250, 0.15);
+    }
+
+    :deep(.van-field__control) {
+      font-size: 16px;
+      padding: 16px;
+    }
+
+    :deep(.van-field__left-icon) {
+      margin-right: 12px;
+      color: #969799;
+    }
   }
 
   .password-strength {
-    display: flex;
-    align-items: center;
-    margin: 8px 0 16px;
-    font-size: 12px;
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 12px 0 24px;
+    border: 1px solid #f0f0f0;
 
-    .strength-label {
-      color: #646566;
-      margin-right: 8px;
-      white-space: nowrap;
+    .strength-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+
+      .strength-label {
+        font-size: 14px;
+        color: #646566;
+        font-weight: 500;
+      }
+
+      .strength-text {
+        font-size: 12px;
+        font-weight: 600;
+
+        &.weak { color: #ee0a24; }
+        &.medium { color: #ff976a; }
+        &.strong { color: #ffd21e; }
+        &.very-strong { color: #07c160; }
+        &.excellent { color: #1989fa; }
+      }
     }
 
     .strength-bar {
-      flex: 1;
-      height: 4px;
-      background-color: #ebedf0;
-      border-radius: 2px;
+      height: 6px;
+      background-color: #f5f5f5;
+      border-radius: 3px;
       overflow: hidden;
-      margin-right: 8px;
+      margin-bottom: 8px;
 
       .strength-fill {
         height: 100%;
-        transition: all 0.3s;
+        transition: all 0.3s ease;
+        border-radius: 3px;
 
-        &.weak {
-          background-color: #ee0a24;
-        }
-
-        &.medium {
-          background-color: #ff976a;
-        }
-
-        &.strong {
-          background-color: #ffd21e;
-        }
-
-        &.very-strong {
-          background-color: #07c160;
-        }
+        &.weak { background: linear-gradient(90deg, #ee0a24 0%, #ff4757 100%); }
+        &.medium { background: linear-gradient(90deg, #ff976a 0%, #ffa726 100%); }
+        &.strong { background: linear-gradient(90deg, #ffd21e 0%, #ffeb3b 100%); }
+        &.very-strong { background: linear-gradient(90deg, #07c160 0%, #4caf50 100%); }
+        &.excellent { background: linear-gradient(90deg, #1989fa 0%, #2196f3 100%); }
       }
     }
 
-    .strength-text {
-      white-space: nowrap;
+    .strength-tips {
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      color: #969799;
 
-      &.weak {
-        color: #ee0a24;
-      }
-
-      &.medium {
-        color: #ff976a;
-      }
-
-      &.strong {
-        color: #ffd21e;
-      }
-
-      &.very-strong {
-        color: #07c160;
+      span {
+        margin-left: 4px;
       }
     }
   }
 
   .terms-section {
-    margin: 20px 0;
-    font-size: 14px;
+    margin: 24px 0;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #ebedf0;
+
+    .terms-text {
+      font-size: 13px;
+      color: #646566;
+      line-height: 1.5;
+    }
 
     .terms-link {
       color: #1989fa;
+      font-weight: 500;
       cursor: pointer;
       
       &:hover {
@@ -423,62 +527,87 @@ export default {
   }
 
   .register-button {
-    margin-top: 20px;
-    border-radius: 25px;
-    height: 50px;
+    height: 48px;
     font-size: 16px;
+    font-weight: 600;
+    margin: 24px 0;
+    box-shadow: 0 4px 12px rgba(25, 137, 250, 0.3);
 
     &:disabled {
-      opacity: 0.5;
+      opacity: 0.6;
+      box-shadow: none;
+    }
+  }
+
+  .login-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 20px;
+
+    .login-text {
+      font-size: 14px;
+      color: #646566;
+    }
+
+    .login-btn {
+      font-size: 14px;
+      height: 32px;
+      padding: 0 16px;
     }
   }
 }
 
-.login-link {
-  text-align: center;
-  font-size: 14px;
-  color: #646566;
+.popup-content {
+  padding: 24px;
+  max-width: 340px;
+  max-height: 70vh;
+  overflow-y: auto;
 
-  .link {
-    color: #1989fa;
-    cursor: pointer;
-    margin-left: 4px;
-    
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-}
-
-.terms-popup,
-.privacy-popup {
-  .popup-content {
-    padding: 30px 20px;
-    max-width: 300px;
+  .popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
 
     h3 {
-      margin: 0 0 16px;
-      color: #323233;
+      margin: 0 0 0 8px;
       font-size: 18px;
-      text-align: center;
+      font-weight: 600;
+      color: #323233;
     }
+  }
 
-    .terms-content,
-    .privacy-content {
-      max-height: 200px;
-      overflow-y: auto;
-      margin-bottom: 20px;
+  .terms-content,
+  .privacy-content {
+    margin-bottom: 24px;
+
+    .term-item,
+    .privacy-item {
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #f5f5f5;
+
+      &:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      h4 {
+        font-size: 14px;
+        font-weight: 600;
+        color: #323233;
+        margin: 0 0 8px;
+      }
 
       p {
-        margin: 8px 0;
+        font-size: 13px;
         color: #646566;
-        font-size: 14px;
         line-height: 1.5;
+        margin: 0;
       }
-    }
-
-    .van-button {
-      width: 100%;
     }
   }
 }
@@ -486,15 +615,20 @@ export default {
 // 响应式适配
 @media (max-width: 375px) {
   .register-content {
-    padding: 16px;
+    padding: 0 16px 16px;
   }
 
-  .logo-section {
-    padding: 20px 0;
+  .header-section {
+    padding: 24px 0 32px;
 
-    h2 {
-      font-size: 22px;
+    .page-title {
+      font-size: 24px;
     }
+  }
+
+  .popup-content {
+    padding: 20px;
+    max-width: 300px;
   }
 }
 </style>

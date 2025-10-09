@@ -60,8 +60,14 @@ module.exports = defineConfig({
     host: '0.0.0.0',
     port: 8080,
     allowedHosts: 'all',
+    hot: true,
+    liveReload: false, // 禁用自动刷新，只使用热重载
     client: {
-      webSocketURL: 'ws://localhost:8080/ws'
+      logging: 'warn', // 减少日志输出
+      overlay: {
+        errors: true,
+        warnings: false
+      }
     }
   },
 
@@ -80,6 +86,12 @@ module.exports = defineConfig({
       alias: {
         '@': require('path').resolve(__dirname, 'src')
       }
+    },
+    // 正确的 watch 配置位置
+    watchOptions: {
+      ignored: /node_modules/,
+      aggregateTimeout: 300,
+      poll: false
     }
   },
 

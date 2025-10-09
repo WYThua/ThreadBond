@@ -20,8 +20,9 @@
       v-if="showTabbar"
       v-model="activeTab" 
       @change="onTabChange"
+      ref="tabbar"
       fixed
-      placeholder
+      :placeholder="false"
       safe-area-inset-bottom
     >
       <van-tabbar-item icon="home-o" to="/home">
@@ -78,12 +79,21 @@ export default {
 
   watch: {
     // 监听路由变化，更新活跃标签
-    '$route'(to) {
-      this.updateActiveTab(to.path);
+    '$route'(to, from) {
+      // 防止重复处理相同路由
+      if (to.path !== from.path) {
+        this.updateActiveTab(to.path);
+      }
     }
   },
 
   created() {
+    // 防止重复初始化
+    if (this.$root._isAppInitialized) {
+      return;
+    }
+    this.$root._isAppInitialized = true;
+    
     // 初始化应用
     this.initApp();
     
@@ -96,11 +106,15 @@ export default {
     async initApp() {
       try {
         // 检查用户登录状态
-        await this.$store.dispatch('auth/checkAuthStatus');
+        if (this.$store.hasModule('auth')) {
+          await this.$store.dispatch('auth/checkAuthStatus');
+        }
         
         // 初始化 Socket 连接（如果已登录）
-        if (this.$store.state.auth.isAuthenticated) {
-          await this.$store.dispatch('socket/connect');
+        if (this.$store.state.auth && this.$store.state.auth.isAuthenticated) {
+          if (this.$store.hasModule('socket')) {
+            await this.$store.dispatch('socket/connect');
+          }
         }
         
         // 设置主题
@@ -131,7 +145,9 @@ export default {
       const savedTheme = localStorage.getItem('threadbond-theme');
       
       const theme = savedTheme || (prefersDark ? 'dark' : 'light');
-      this.$store.commit('app/setTheme', theme);
+      if (this.$store.hasModule('app')) {
+        this.$store.commit('app/SET_THEME', theme);
+      }
       
       // 应用主题到 HTML 根元素
       document.documentElement.setAttribute('data-theme', theme);
@@ -149,8 +165,16 @@ export default {
     // 标签切换处理
     onTabChange(index) {
       const routes = ['/home', '/discover', '/create', '/chat', '/profile'];
-      if (routes[index] && this.$route.path !== routes[index]) {
-        this.$router.push(routes[index]);
+      const targetRoute = routes[index];
+      
+      // 防止重复导航到当前路由
+      if (targetRoute && this.$route.path !== targetRoute) {
+        this.$router.push(targetRoute).catch(err => {
+          // 忽略重复导航错误
+          if (err.name !== 'NavigationDuplicated') {
+            console.error('路由导航错误:', err);
+          }
+        });
       }
     },
 
@@ -162,7 +186,7 @@ export default {
       });
       
       // 重新连接 Socket
-      if (this.$store.state.auth.isAuthenticated) {
+      if (this.$store.state.auth && this.$store.state.auth.isAuthenticated && this.$store.hasModule('socket')) {
         this.$store.dispatch('socket/reconnect');
       }
     },
@@ -179,13 +203,17 @@ export default {
     onVisibilityChange() {
       if (document.hidden) {
         // 页面隐藏时的处理
-        this.$store.commit('app/setAppVisible', false);
+        if (this.$store.hasModule('app')) {
+          this.$store.commit('app/SET_APP_VISIBLE', false);
+        }
       } else {
         // 页面显示时的处理
-        this.$store.commit('app/setAppVisible', true);
+        if (this.$store.hasModule('app')) {
+          this.$store.commit('app/SET_APP_VISIBLE', true);
+        }
         
         // 刷新数据
-        if (this.$store.state.auth.isAuthenticated) {
+        if (this.$store.state.auth && this.$store.state.auth.isAuthenticated && this.$store.hasModule('chat')) {
           this.$store.dispatch('chat/refreshUnreadCount');
         }
       }
@@ -197,7 +225,9 @@ export default {
       event.preventDefault();
       
       // 保存事件，稍后可以手动触发
-      this.$store.commit('app/setInstallPrompt', event);
+      if (this.$store.hasModule('app')) {
+        this.$store.commit('app/SET_INSTALL_PROMPT', event);
+      }
     }
   },
 
@@ -224,7 +254,7 @@ export default {
   min-height: 100vh;
   
   &.has-tabbar {
-    padding-bottom: 50px;
+    padding-bottom: 50px; /* 手动设置底部间距，避免依赖 placeholder */
   }
 }
 

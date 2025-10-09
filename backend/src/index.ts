@@ -30,8 +30,18 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:8080",
-    methods: ["GET", "POST"]
+    origin: [
+      process.env.FRONTEND_URL || "http://localhost:8080",
+      "http://localhost:8081", // 添加 8081 端口支持
+      "http://localhost:8083", // 添加 8083 端口支持
+      "http://127.0.0.1:8080",
+      "http://127.0.0.1:8081",
+      "http://127.0.0.1:8083",
+      "http://172.16.1.75:8081", // 添加网络地址支持
+      "http://172.16.1.75:8083"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -41,8 +51,30 @@ const PORT = process.env.PORT || 3000;
 app.use(helmet()); // 安全头部
 app.use(compression()); // 响应压缩
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:8080",
-  credentials: true
+  origin: [
+    "http://localhost:8080", // 确保 8080 端口在列表中
+    "http://localhost:8081", 
+    "http://localhost:8083", 
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
+    "http://127.0.0.1:8083",
+    "http://172.16.1.75:8080", // 添加网络地址支持
+    "http://172.16.1.75:8081",
+    "http://172.16.1.75:8083"
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With', 
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'Pragma'
+  ],
+  exposedHeaders: ['set-cookie'],
+  optionsSuccessStatus: 200 // 支持旧版浏览器
 }));
 app.use(morgan('combined')); // 日志记录
 app.use(express.json({ limit: '10mb' }));
@@ -107,9 +139,8 @@ app.use(errorHandler);
 // 初始化服务
 async function startServer() {
   try {
-    // 连接 Redis
-    await connectRedis();
-    console.log('✅ Redis 连接成功');
+    // 暂时跳过 Redis 连接
+    console.log('⚠️  跳过 Redis 连接（开发模式）');
 
     // 设置 Socket.IO
     setupSocketIO(io);

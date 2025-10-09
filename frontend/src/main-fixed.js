@@ -27,10 +27,6 @@ import './filters';
 import './directives';
 import './utils/domHelper';
 
-// Vant 组件修复
-import { fixVantTabbar } from './utils/vantFix';
-fixVantTabbar();
-
 Vue.config.productionTip = false;
 
 // 强制修复 Vuex mutation 错误
@@ -70,8 +66,7 @@ window.addEventListener('error', (event) => {
   
   if (message.includes('getBoundingClientRect') || 
       message.includes('unknown mutation type') ||
-      message.includes('Cannot read properties of undefined') ||
-      message.includes('setHeight')) {
+      message.includes('Cannot read properties of undefined')) {
     console.warn('JavaScript 错误已被捕获:', message);
     event.preventDefault();
     return;
@@ -86,15 +81,8 @@ window.addEventListener('unhandledrejection', (event) => {
   event.preventDefault();
 });
 
-// 防止重复挂载
-if (window.__VUE_APP_MOUNTED__) {
-  console.warn('Vue 应用已挂载，跳过重复挂载');
-} else {
-  window.__VUE_APP_MOUNTED__ = true;
-  
-  new Vue({
-    router,
-    store,
-    render: h => h(App)
-  }).$mount('#app');
-}
+new Vue({
+  router,
+  store,
+  render: h => h(App)
+}).$mount('#app');

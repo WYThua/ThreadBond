@@ -10,14 +10,12 @@ export const registerSchema = Joi.object({
       'any.required': '邮箱地址不能为空'
     }),
   password: Joi.string()
-    .min(8)
+    .min(6)
     .max(128)
-    .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
     .required()
     .messages({
-      'string.min': '密码长度至少为8位',
+      'string.min': '密码长度至少为6位',
       'string.max': '密码长度不能超过128位',
-      'string.pattern.base': '密码必须包含大小写字母、数字和特殊字符',
       'any.required': '密码不能为空'
     })
 });
@@ -124,43 +122,38 @@ export function checkPasswordStrength(password: string): {
   let score = 0;
 
   // 长度检查
-  if (password.length >= 8) {
+  if (password.length >= 6) {
     score += 1;
+    if (password.length >= 8) {
+      score += 1; // 8位以上额外加分
+    }
   } else {
-    feedback.push('密码长度至少为8位');
+    feedback.push('密码长度至少为6位');
   }
 
-  // 包含小写字母
+  // 包含小写字母（可选，加分项）
   if (/[a-z]/.test(password)) {
     score += 1;
-  } else {
-    feedback.push('密码应包含小写字母');
   }
 
-  // 包含大写字母
+  // 包含大写字母（可选，加分项）
   if (/[A-Z]/.test(password)) {
     score += 1;
-  } else {
-    feedback.push('密码应包含大写字母');
   }
 
-  // 包含数字
+  // 包含数字（可选，加分项）
   if (/\d/.test(password)) {
     score += 1;
-  } else {
-    feedback.push('密码应包含数字');
   }
 
-  // 包含特殊字符
+  // 包含特殊字符（可选，加分项）
   if (/[@$!%*?&]/.test(password)) {
     score += 1;
-  } else {
-    feedback.push('密码应包含特殊字符(@$!%*?&)');
   }
 
   return {
-    isValid: score >= 4,
-    score,
+    isValid: password.length >= 6, // 只要长度大于等于6位就有效
+    score: Math.min(score, 5),
     feedback
   };
 }

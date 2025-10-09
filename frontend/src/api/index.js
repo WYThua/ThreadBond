@@ -6,6 +6,7 @@ import { Toast } from 'vant';
 const api = axios.create({
   baseURL: process.env.VUE_APP_API_BASE_URL || 'http://localhost:3000/api',
   timeout: 10000,
+  withCredentials: true, // 支持跨域携带 cookies
   headers: {
     'Content-Type': 'application/json'
   }
@@ -39,9 +40,10 @@ api.interceptors.response.use(
       return data;
     }
     
-    // 如果是失败响应，抛出错误
+    // 如果是失败响应，抛出错误，但保留原始响应信息
     const error = new Error(data.message || '请求失败');
     error.code = data.code;
+    error.response = response; // 保留响应信息
     return Promise.reject(error);
   },
   async error => {

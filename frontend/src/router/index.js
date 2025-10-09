@@ -163,17 +163,23 @@ router.beforeEach(async (to, from, next) => {
   // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - ThreadBond` : 'ThreadBond';
 
+  // 防止重复导航
+  if (to.path === from.path) {
+    next(false);
+    return;
+  }
+
   // 检查是否需要认证
   if (to.meta.requiresAuth) {
     // 检查用户是否已登录
-    const isAuthenticated = store.state.auth.isAuthenticated;
+    const isAuthenticated = store.state.auth?.isAuthenticated;
     
     if (!isAuthenticated) {
       // 尝试从本地存储恢复登录状态
       try {
         await store.dispatch('auth/checkAuthStatus');
         
-        if (store.state.auth.isAuthenticated) {
+        if (store.state.auth?.isAuthenticated) {
           next();
         } else {
           // 未登录，重定向到登录页
@@ -196,7 +202,7 @@ router.beforeEach(async (to, from, next) => {
     // 不需要认证的页面
     if (to.path === '/login' || to.path === '/register') {
       // 如果已登录，重定向到首页
-      if (store.state.auth.isAuthenticated) {
+      if (store.state.auth?.isAuthenticated) {
         next('/home');
       } else {
         next();
@@ -209,7 +215,21 @@ router.beforeEach(async (to, from, next) => {
 
 router.afterEach((to, from) => {
   // 页面切换后的处理
-  store.commit('app/setCurrentRoute', to);
+  if (store.hasModule('app')) {
+    try {
+      store.commit('app/SET_CURRENT_ROUTE', to);
+    } catch (error) {
+      console.warn('路由 mutation 调用失败，尝试备用方案:', error);
+      try {
+        // 尝试直接设置状态
+        if (store.state.app) {
+          store.state.app.currentRoute = to;
+        }
+      } catch (fallbackError) {
+        console.error('备用方案也失败:', fallbackError);
+      }
+    }
+  }
   
   // 埋点统计
   if (typeof gtag !== 'undefined') {

@@ -24,14 +24,16 @@ export async function connectRedis() {
     
     return redisClient;
   } catch (error) {
-    console.error('Redis 初始化失败:', error);
-    throw error;
+    console.warn('⚠️  Redis 连接失败，将在无缓存模式下运行:', (error as Error).message);
+    // 不抛出错误，允许应用在没有 Redis 的情况下运行
+    return null;
   }
 }
 
 export function getRedisClient() {
   if (!redisClient) {
-    throw new Error('Redis 客户端未初始化');
+    console.warn('Redis 客户端未初始化，返回 null');
+    return null;
   }
   return redisClient;
 }
@@ -39,7 +41,11 @@ export function getRedisClient() {
 // Redis 工具函数
 export class RedisService {
   private get client() {
-    return getRedisClient();
+    const client = getRedisClient();
+    if (!client) {
+      throw new Error('Redis 客户端不可用，请检查 Redis 服务是否运行');
+    }
+    return client;
   }
 
   // 设置缓存

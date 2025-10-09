@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网络连接测试</title>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>ThreadBond 网络连接测试</h1>
+    
+    <div class="test-section info">
+        <h3>测试说明</h3>
+        <p>此页面用于测试前端与后端的网络连接，诊断 AxiosError Network Error 问题。</p>
+        <p>后端地址: <strong>http://localhost:3000/api</strong></p>
+    </div>
+    
+    <div class="test-section">
+        <h3>连接测试</h3>
+        <button onclick="testConnection()">测试基础连接</button>
+        <button onclick="testCORS()">测试 CORS 配置</button>
+        <button onclick="testRegister()">测试注册接口</button>
+        <button onclick="clearResults()">清除结果</button>
+        <div id="results"></div>
+    </div>
+    
+    <script>
+        const api = axios.create({
+            baseURL: 'http://localhost:3000/api',
+            timeout: 10000,
+            withCredentials: true,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        function addResult(title, content, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `test-section ${type}`;
+            div.innerHTML = `<h4>${title}</h4><pre>${content}</pre>`;
+            results.appendChild(div);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        async function testConnection() {
+            try {
+                addResult('🔄 测试基础连接', '正在测试...', 'info');
+                
+                const response = await api.post('/auth/check-email', {
+                    email: 'test@example.com'
+                });
+                
+                addResult('✅ 基础连接测试', JSON.stringify(response.data, null, 2), 'success');
+                
+            } catch (error) {
+                let errorInfo = {
+                    message: error.message,
+                    code: error.code,
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    data: error.response?.data
+                };
+                
+                addResult('❌ 基础连接测试失败', JSON.stringify(errorInfo, null, 2), 'error');
+            }
+        }
+        
+        async function testCORS() {
+            try {
+                addResult('🔄 测试 CORS', '正在测试跨域配置...', 'info');
+                
+                // 使用原生 fetch 测试 CORS
+                const response = await fetch('http://localhost:3000/api/auth/check-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ email: 'cors-test@example.com' })
+                });
+                
+                const data = await response.json();
+                
+                addResult('✅ CORS 测试', `状态: ${response.status}\n响应: ${JSON.stringify(data, null, 2)}`, 'success');
+                
+            } catch (error) {
+                addResult('❌ CORS 测试失败', error.message, 'error');
+            }
+        }
+        
+        async function testRegister() {
+            try {
+                addResult('🔄 测试注册接口', '正在测试注册功能...', 'info');
+                
+                const testEmail = `test${Date.now()}@example.com`;
+                const response = await api.post('/auth/register', {
+                    email: testEmail,
+                    password: 'Test123!@#'
+                });
+                
+                addResult('✅ 注册接口测试', JSON.stringify(response.data, null, 2), 'success');
+                
+            } catch (error) {
+                let errorInfo = {
+                    message: error.message,
+                    code: error.code,
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    data: error.response?.data,
+                    config: {
+                        url: error.config?.url,
+                        method: error.config?.method,
+                        baseURL: error.config?.baseURL
+                    }
+                };
+                
+                addResult('❌ 注册接口测试', JSON.stringify(errorInfo, null, 2), 'error');
+            }
+        }
+        
+        // 页面加载时自动测试基础连接
+        window.onload = function() {
+            setTimeout(testConnection, 1000);
+        };
+    </script>
+</body>
+</html>

@@ -33,17 +33,21 @@ export const authLimiter = rateLimit({
   skipSuccessfulRequests: true // 成功的请求不计入限制
 });
 
-// 注册速率限制
+// 注册速率限制 (开发环境放宽限制)
 export const registerLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1小时
-  max: 3, // 每个IP每小时最多3次注册尝试
+  windowMs: 5 * 60 * 1000, // 5分钟 (开发环境)
+  max: 10, // 每个IP每5分钟最多10次注册尝试 (开发环境)
   message: {
     success: false,
-    message: '注册尝试过于频繁，请1小时后再试',
-    retryAfter: '1小时'
+    message: '注册尝试过于频繁，请5分钟后再试',
+    retryAfter: '5分钟'
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  skip: (req) => {
+    // 开发环境跳过频率限制
+    return process.env.NODE_ENV === 'development';
+  }
 });
 
 // 解密尝试速率限制

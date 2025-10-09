@@ -5,11 +5,13 @@
   "main": "index.js",
   "scripts": {
     "dev": "docker-compose up --build",
-    "dev:backend": "docker-compose up backend",
-    "dev:frontend": "docker-compose up frontend",
+    "dev:backend": "docker-compose up --build mysql redis backend",
+    "dev:frontend": "node start-frontend-only.js",
     "build": "docker-compose build",
     "stop": "docker-compose down",
-    "clean": "docker-compose down -v --rmi all"
+    "clean": "docker-compose down -v --rmi all",
+    "check-rules": "node check-backend-rule.js",
+    "start": "node start-with-docker.js"
   },
   "keywords": ["social", "anonymous", "chat", "mobile", "pwa"],
   "author": "ThreadBond Team",

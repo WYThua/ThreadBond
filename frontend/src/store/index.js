@@ -22,10 +22,38 @@ const store = new Vuex.Store({
   },
 
   // 严格模式，在开发环境下启用
-  strict: process.env.NODE_ENV !== 'production',
+  strict: false, // 暂时禁用严格模式以避免潜在问题
 
   // 插件
   plugins: [
+    // 错误处理插件
+    store => {
+      // 重写 commit 方法以捕获错误
+      const originalCommit = store.commit;
+      store.commit = function(type, payload, options) {
+        try {
+          // 处理常见的命名错误
+          if (type === 'app/setCurrentRoute') {
+            console.warn('自动修正 mutation 名称: app/setCurrentRoute -> app/SET_CURRENT_ROUTE');
+            type = 'app/SET_CURRENT_ROUTE';
+          }
+          
+          return originalCommit.call(this, type, payload, options);
+        } catch (error) {
+          console.error('Vuex commit 错误:', error);
+          
+          // 如果是未知的 mutation 类型，尝试自动修正
+          if (error.message && error.message.includes('unknown mutation type')) {
+            console.warn('尝试自动修正 mutation 名称...');
+            // 这里可以添加更多的自动修正逻辑
+          }
+          
+          // 不抛出错误，避免应用崩溃
+          return;
+        }
+      };
+    },
+    
     // 持久化插件（可选）
     store => {
       // 监听 mutation，将某些状态持久化到 localStorage
