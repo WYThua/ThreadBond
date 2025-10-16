@@ -22,7 +22,7 @@ export const rateLimiter = rateLimit({
 // 认证相关的严格速率限制
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
-  max: 5, // 每个IP最多5次认证尝试
+  max: process.env.NODE_ENV === 'development' ? 100 : 5, // 开发环境放宽限制
   message: {
     success: false,
     message: '登录尝试过于频繁，请15分钟后再试',
@@ -30,7 +30,11 @@ export const authLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: true // 成功的请求不计入限制
+  skipSuccessfulRequests: true, // 成功的请求不计入限制
+  skip: (req) => {
+    // 开发环境对验证码发送请求跳过限制
+    return process.env.NODE_ENV === 'development' && req.path.includes('send-verification-code');
+  }
 });
 
 // 注册速率限制 (开发环境放宽限制)
@@ -107,5 +111,26 @@ export const aiServiceLimiter = rateLimit({
   keyGenerator: (req: Request) => {
     const user = req.user as any;
     return user?.id || req.ip;
+  }
+});
+
+// 验证码发送速率限制
+export const verificationCodeLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1分钟
+  max: process.env.NODE_ENV === 'development' ? 10 : 3, // 开发环境每分钟10次，生产环境3次
+  message: {
+    success: false,
+    message: 'Too many verification code requests, please try again later',
+    retryAfter: '1分钟'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: Request) => {
+    // 使用邮箱作为key，防止同一邮箱频繁请求
+    return req.body.email || req.ip;
+  },
+  skip: (req) => {
+    // 开发环境可以选择跳过限制
+    return process.env.NODE_ENV === 'development' && process.env.SKIP_RATE_LIMIT === 'true';
   }
 });

@@ -92,9 +92,22 @@ if (window.__VUE_APP_MOUNTED__) {
 } else {
   window.__VUE_APP_MOUNTED__ = true;
   
-  new Vue({
+  // 创建 Vue 实例
+  const app = new Vue({
     router,
     store,
-    render: h => h(App)
-  }).$mount('#app');
+    render: h => h(App),
+    
+    async created() {
+      // 应用启动时初始化认证状态
+      try {
+        await this.$store.dispatch('auth/initializeAuth');
+        console.log('认证状态初始化完成');
+      } catch (error) {
+        console.error('认证状态初始化失败:', error);
+      }
+    }
+  });
+  
+  app.$mount('#app');
 }

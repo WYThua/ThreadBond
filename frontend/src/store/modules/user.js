@@ -1,7 +1,9 @@
+import cookieAuth from '@/utils/cookieAuth';
+
 // 用户信息状态管理
 const state = {
-  // 用户基本信息
-  userInfo: JSON.parse(localStorage.getItem('threadbond-user') || 'null'),
+  // 用户基本信息（优先从 Cookie 获取，兼容 localStorage）
+  userInfo: cookieAuth.getUserInfo() || JSON.parse(localStorage.getItem('threadbond-user') || 'null'),
   
   // 匿名身份列表
   anonymousIdentities: [],
@@ -40,6 +42,9 @@ const mutations = {
   // 设置用户信息
   SET_USER_INFO(state, userInfo) {
     state.userInfo = userInfo;
+    cookieAuth.setUserInfo(userInfo);
+    
+    // 兼容性：同时更新 localStorage（逐步迁移）
     if (userInfo) {
       localStorage.setItem('threadbond-user', JSON.stringify(userInfo));
     } else {
@@ -59,6 +64,11 @@ const mutations = {
   
   // 设置当前匿名身份
   SET_CURRENT_ANONYMOUS_IDENTITY(state, identity) {
+    state.currentAnonymousIdentity = identity;
+  },
+
+  // 设置匿名身份（兼容旧的命名）
+  SET_ANONYMOUS_IDENTITY(state, identity) {
     state.currentAnonymousIdentity = identity;
   },
   
@@ -106,6 +116,7 @@ const mutations = {
     state.userInfo = null;
     state.anonymousIdentities = [];
     state.currentAnonymousIdentity = null;
+    cookieAuth.removeUserInfo();
     localStorage.removeItem('threadbond-user');
   }
 };

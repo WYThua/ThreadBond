@@ -12,21 +12,11 @@ const Chat = () => import('@/views/Chat.vue');
 const Profile = () => import('@/views/Profile.vue');
 const Login = () => import('@/views/auth/Login.vue');
 const Register = () => import('@/views/auth/Register.vue');
-const Welcome = () => import('@/views/Welcome.vue');
 
 const routes = [
   {
     path: '/',
-    redirect: '/welcome'
-  },
-  {
-    path: '/welcome',
-    name: 'Welcome',
-    component: Welcome,
-    meta: {
-      title: '欢迎使用 ThreadBond',
-      requiresAuth: false
-    }
+    redirect: '/login'
   },
   {
     path: '/login',
@@ -171,17 +161,23 @@ router.beforeEach(async (to, from, next) => {
 
   // 检查是否需要认证
   if (to.meta.requiresAuth) {
+    console.log('🔐 页面需要认证，检查登录状态...');
+    
     // 检查用户是否已登录
     const isAuthenticated = store.state.auth?.isAuthenticated;
+    console.log('🔍 当前认证状态:', isAuthenticated);
     
     if (!isAuthenticated) {
       // 尝试从本地存储恢复登录状态
       try {
-        await store.dispatch('auth/checkAuthStatus');
+        console.log('🔄 尝试恢复认证状态...');
+        const authResult = await store.dispatch('auth/checkAuthStatus');
         
-        if (store.state.auth?.isAuthenticated) {
+        if (authResult && store.state.auth?.isAuthenticated) {
+          console.log('✅ 认证状态恢复成功，允许访问');
           next();
         } else {
+          console.log('❌ 认证失败，重定向到登录页');
           // 未登录，重定向到登录页
           next({
             path: '/login',
@@ -189,13 +185,21 @@ router.beforeEach(async (to, from, next) => {
           });
         }
       } catch (error) {
-        console.error('认证检查失败:', error);
-        next({
-          path: '/login',
-          query: { redirect: to.fullPath }
-        });
+        console.error('❌ 认证检查失败:', error);
+        // 只有在非网络错误时才跳转到登录页
+        if (!error.isNetworkError) {
+          next({
+            path: '/login',
+            query: { redirect: to.fullPath }
+          });
+        } else {
+          // 网络错误时，显示错误提示但不跳转
+          console.log('🌐 网络错误，停留在当前页面');
+          next(false);
+        }
       }
     } else {
+      console.log('✅ 已认证，允许访问');
       next();
     }
   } else {
@@ -203,6 +207,7 @@ router.beforeEach(async (to, from, next) => {
     if (to.path === '/login' || to.path === '/register') {
       // 如果已登录，重定向到首页
       if (store.state.auth?.isAuthenticated) {
+        console.log('🏠 已登录用户访问登录页，重定向到首页');
         next('/home');
       } else {
         next();

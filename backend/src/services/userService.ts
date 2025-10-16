@@ -8,6 +8,7 @@ const prisma = new PrismaClient();
 export interface RegisterUserData {
   email: string;
   password: string;
+  verificationCode: string;
 }
 
 export interface UserWithToken {

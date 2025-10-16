@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
-import { getRedisService } from './redis';
+import { getRedisService, getRedisClient } from './redis';
 
 const prisma = new PrismaClient();
 
@@ -89,11 +89,21 @@ export function setupSocketIO(io: Server) {
 async function handleUserOnline(socket: AuthenticatedSocket) {
   if (!socket.userId) return;
 
-  // 更新用户在线状态
-  await getRedisService().set(`user:online:${socket.userId}`, {
-    socketId: socket.id,
-    connectedAt: new Date().toISOString()
-  }, 3600); // 1小时过期
+  try {
+    // 尝试更新用户在线状态（如果 Redis 可用）
+    const redisClient = getRedisClient();
+    if (redisClient) {
+      await getRedisService().set(`user:online:${socket.userId}`, {
+        socketId: socket.id,
+        connectedAt: new Date().toISOString()
+      }, 3600); // 1小时过期
+      console.log(`✅ 用户在线状态已保存到 Redis: ${socket.userId}`);
+    } else {
+      console.log(`⚠️ Redis 不可用，跳过在线状态保存: ${socket.userId}`);
+    }
+  } catch (error) {
+    console.error('❌ 保存用户在线状态失败:', error);
+  }
 
   // 通知相关用户
   socket.broadcast.emit('user_online', {
@@ -106,8 +116,18 @@ async function handleUserOnline(socket: AuthenticatedSocket) {
 async function handleUserOffline(socket: AuthenticatedSocket) {
   if (!socket.userId) return;
 
-  // 移除在线状态
-  await getRedisService().del(`user:online:${socket.userId}`);
+  try {
+    // 尝试移除在线状态（如果 Redis 可用）
+    const redisClient = getRedisClient();
+    if (redisClient) {
+      await getRedisService().del(`user:online:${socket.userId}`);
+      console.log(`✅ 用户离线状态已从 Redis 移除: ${socket.userId}`);
+    } else {
+      console.log(`⚠️ Redis 不可用，跳过离线状态移除: ${socket.userId}`);
+    }
+  } catch (error) {
+    console.error('❌ 移除用户离线状态失败:', error);
+  }
 
   // 通知相关用户
   socket.broadcast.emit('user_offline', {

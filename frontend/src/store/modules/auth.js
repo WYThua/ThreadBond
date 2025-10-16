@@ -1,15 +1,16 @@
 import { authAPI } from '@/api/auth';
+import cookieAuth from '@/utils/cookieAuth';
 
 // 认证状态管理
 const state = {
   // 认证状态
-  isAuthenticated: false,
+  isAuthenticated: cookieAuth.getAuthStatus(),
   
   // 用户令牌
-  token: localStorage.getItem('threadbond-token') || null,
+  token: cookieAuth.getToken(),
   
   // 刷新令牌
-  refreshToken: localStorage.getItem('threadbond-refresh-token') || null,
+  refreshToken: cookieAuth.getRefreshToken(),
   
   // 登录状态
   loginLoading: false,
@@ -22,26 +23,19 @@ const mutations = {
   // 设置认证状态
   SET_AUTHENTICATED(state, status) {
     state.isAuthenticated = status;
+    cookieAuth.setAuthStatus(status);
   },
   
   // 设置令牌
   SET_TOKEN(state, token) {
     state.token = token;
-    if (token) {
-      localStorage.setItem('threadbond-token', token);
-    } else {
-      localStorage.removeItem('threadbond-token');
-    }
+    cookieAuth.setToken(token);
   },
   
   // 设置刷新令牌
   SET_REFRESH_TOKEN(state, refreshToken) {
     state.refreshToken = refreshToken;
-    if (refreshToken) {
-      localStorage.setItem('threadbond-refresh-token', refreshToken);
-    } else {
-      localStorage.removeItem('threadbond-refresh-token');
-    }
+    cookieAuth.setRefreshToken(refreshToken);
   },
   
   // 设置登录加载状态
@@ -59,29 +53,92 @@ const mutations = {
     state.isAuthenticated = false;
     state.token = null;
     state.refreshToken = null;
-    localStorage.removeItem('threadbond-token');
-    localStorage.removeItem('threadbond-refresh-token');
-    localStorage.removeItem('threadbond-user');
+    cookieAuth.clearAll();
   }
 };
 
 const actions = {
   // 检查认证状态
   async checkAuthStatus({ commit, state }) {
+    console.log('🔍 检查认证状态，当前 token:', state.token ? '存在' : '不存在');
+    
     if (state.token) {
       try {
+        console.log('📡 调用 verifyToken API...');
         const response = await authAPI.verifyToken();
+        console.log('📡 verifyToken 响应:', response);
+        
         if (response.success) {
+          console.log('✅ Token 验证成功');
           commit('SET_AUTHENTICATED', true);
+          
+          // 如果响应中包含用户信息，更新用户状态
+          if (response.data && response.data.user) {
+            console.log('👤 更新用户信息:', response.data.user);
+            commit('user/SET_USER_INFO', response.data.user, { root: true });
+          }
+          if (response.data && response.data.anonymousIdentity) {
+            console.log('🎭 更新匿名身份:', response.data.anonymousIdentity);
+            commit('user/SET_ANONYMOUS_IDENTITY', response.data.anonymousIdentity, { root: true });
+          }
+          
+          return true;
         } else {
+          console.log('❌ Token 验证失败:', response.message);
           commit('CLEAR_AUTH');
+          return false;
         }
       } catch (error) {
-        console.error('认证状态检查失败:', error);
+        console.error('❌ 认证状态检查失败:', error);
+        // 如果是网络错误，不清除认证状态，给用户重试机会
+        if (error.isNetworkError) {
+          console.log('🌐 网络错误，保持当前认证状态');
+          return false;
+        }
         commit('CLEAR_AUTH');
+        return false;
       }
     } else {
+      console.log('🚫 没有 token，设置为未认证状态');
       commit('SET_AUTHENTICATED', false);
+      return false;
+    }
+  },
+
+  // 初始化认证状态
+  async initializeAuth({ commit, state, dispatch }) {
+    console.log('🚀 初始化认证状态...');
+    
+    // 首先尝试从 localStorage 迁移数据到 Cookie
+    cookieAuth.migrateFromLocalStorage();
+    
+    // 重新从 Cookie 获取最新状态
+    const token = cookieAuth.getToken();
+    const authStatus = cookieAuth.getAuthStatus();
+    
+    // 更新 Vuex 状态
+    if (token !== state.token) {
+      commit('SET_TOKEN', token);
+    }
+    if (authStatus !== state.isAuthenticated) {
+      commit('SET_AUTHENTICATED', authStatus);
+    }
+    
+    // 如果有 token，尝试验证
+    if (token) {
+      try {
+        console.log('🔍 发现 Token，验证有效性...');
+        const isValid = await dispatch('checkAuthStatus');
+        return isValid;
+      } catch (error) {
+        console.error('❌ 认证初始化失败:', error);
+        commit('CLEAR_AUTH');
+        return false;
+      }
+    } else {
+      console.log('🚫 没有 Token，设置为未认证状态');
+      commit('SET_AUTHENTICATED', false);
+      return false;
     }
   },
   
@@ -96,10 +153,16 @@ const actions = {
         commit('SET_TOKEN', response.data.token);
         commit('SET_AUTHENTICATED', true);
         
-        // 存储用户信息到用户模块
-        commit('user/SET_USER_INFO', response.data.user, { root: true });
-        commit('user/SET_ANONYMOUS_IDENTITY', response.data.anonymousIdentity, { root: true });
+        // 存储用户信息到用户模块和 Cookie
+        if (response.data.user) {
+          commit('user/SET_USER_INFO', response.data.user, { root: true });
+          cookieAuth.setUserInfo(response.data.user);
+        }
+        if (response.data.anonymousIdentity) {
+          commit('user/SET_ANONYMOUS_IDENTITY', response.data.anonymousIdentity, { root: true });
+        }
         
+        console.log('✅ 登录成功，认证信息已保存到 Cookie');
         return { success: true, data: response.data, message: response.message };
       } else {
         return { success: false, message: response.message };
@@ -125,10 +188,16 @@ const actions = {
         commit('SET_TOKEN', response.data.token);
         commit('SET_AUTHENTICATED', true);
         
-        // 存储用户信息到用户模块
-        commit('user/SET_USER_INFO', response.data.user, { root: true });
-        commit('user/SET_ANONYMOUS_IDENTITY', response.data.anonymousIdentity, { root: true });
+        // 存储用户信息到用户模块和 Cookie
+        if (response.data.user) {
+          commit('user/SET_USER_INFO', response.data.user, { root: true });
+          cookieAuth.setUserInfo(response.data.user);
+        }
+        if (response.data.anonymousIdentity) {
+          commit('user/SET_ANONYMOUS_IDENTITY', response.data.anonymousIdentity, { root: true });
+        }
         
+        console.log('✅ 注册成功，认证信息已保存到 Cookie');
         return { success: true, data: response.data, message: response.message };
       } else {
         return { success: false, message: response.message };
