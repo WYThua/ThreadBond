@@ -127,24 +127,6 @@
               <div class="card-glow"></div>
             </div>
           </div>
-
-          <div class="secondary-actions">
-            <div class="secondary-card" @click="goToChat">
-              <div class="secondary-icon chat-icon"></div>
-              <span class="secondary-text">匿名聊天</span>
-              <div class="secondary-badge">3</div>
-            </div>
-
-            <div class="secondary-card" @click="goToProfile">
-              <div class="secondary-icon profile-icon"></div>
-              <span class="secondary-text">个人中心</span>
-            </div>
-
-            <div class="secondary-card" @click="showStats">
-              <div class="secondary-icon stats-icon"></div>
-              <span class="secondary-text">数据统计</span>
-            </div>
-          </div>
         </div>
 
         <!-- 动态时间线 -->
@@ -308,23 +290,43 @@ export default {
     },
 
     startExploring() {
-      this.$router.push('/discover');
+      this.$router.push('/discover').catch(err => {
+        if (err.name !== 'NavigationDuplicated') {
+          console.error('路由跳转错误:', err);
+        }
+      });
     },
 
     goToCreate() {
-      this.$router.push('/create');
+      this.$router.push('/create').catch(err => {
+        if (err.name !== 'NavigationDuplicated') {
+          console.error('路由跳转错误:', err);
+        }
+      });
     },
 
     goToDiscover() {
-      this.$router.push('/discover');
+      this.$router.push('/discover').catch(err => {
+        if (err.name !== 'NavigationDuplicated') {
+          console.error('路由跳转错误:', err);
+        }
+      });
     },
 
     goToChat() {
-      this.$router.push('/chat');
+      this.$router.push('/chat').catch(err => {
+        if (err.name !== 'NavigationDuplicated') {
+          console.error('路由跳转错误:', err);
+        }
+      });
     },
 
     goToProfile() {
-      this.$router.push('/profile');
+      this.$router.push('/profile').catch(err => {
+        if (err.name !== 'NavigationDuplicated') {
+          console.error('路由跳转错误:', err);
+        }
+      });
     },
 
     showNotifications() {

@@ -148,13 +148,39 @@ const router = new VueRouter({
   }
 });
 
+// 处理重复导航错误
+const originalPush = VueRouter.prototype.push;
+const originalReplace = VueRouter.prototype.replace;
+
+VueRouter.prototype.push = function push(location, onResolve, onReject) {
+  if (onResolve || onReject) {
+    return originalPush.call(this, location, onResolve, onReject);
+  }
+  return originalPush.call(this, location).catch(err => {
+    if (err.name !== 'NavigationDuplicated') {
+      throw err;
+    }
+  });
+};
+
+VueRouter.prototype.replace = function replace(location, onResolve, onReject) {
+  if (onResolve || onReject) {
+    return originalReplace.call(this, location, onResolve, onReject);
+  }
+  return originalReplace.call(this, location).catch(err => {
+    if (err.name !== 'NavigationDuplicated') {
+      throw err;
+    }
+  });
+};
+
 // 全局路由守卫
 router.beforeEach(async (to, from, next) => {
   // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - ThreadBond` : 'ThreadBond';
 
   // 防止重复导航
-  if (to.path === from.path) {
+  if (to.path === from.path && to.query === from.query) {
     next(false);
     return;
   }

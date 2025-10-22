@@ -241,7 +241,16 @@ export default {
           setTimeout(() => {
             this.showLoginResultPopup = false;
             const redirect = this.$route.query.redirect || '/home';
-            this.$router.replace(redirect);
+            
+            // 防止重复导航错误
+            if (this.$route.path !== redirect) {
+              this.$router.replace(redirect).catch(err => {
+                // 忽略重复导航错误
+                if (err.name !== 'NavigationDuplicated') {
+                  console.error('路由跳转错误:', err);
+                }
+              });
+            }
           }, 2000);
         }
       } catch (error) {
