@@ -11,6 +11,7 @@
     "pwa:build": "vue-cli-service build --mode production"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.1.0",
     "axios": "^1.6.2",
     "crypto-js": "^4.2.0",
     "dayjs": "^1.11.10",

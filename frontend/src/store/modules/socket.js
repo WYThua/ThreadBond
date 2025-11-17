@@ -60,6 +60,10 @@ const actions = {
   // 连接 Socket.IO
   async connect({ commit, dispatch, rootState }) {
     try {
+      // 暂时禁用 Socket 连接以避免认证问题
+      console.log('⚠️ Socket 连接暂时禁用，避免认证错误');
+      return { success: false, message: 'Socket 连接已禁用' };
+      
       // 检查是否已经连接
       if (state.socket && state.connected) {
         return { success: true, message: '已经连接' };
@@ -67,8 +71,19 @@ const actions = {
       
       // 检查用户是否已登录
       if (!rootState.auth.isAuthenticated || !rootState.auth.token) {
+        console.log('用户未登录，跳过 Socket 连接');
         return { success: false, message: '用户未登录' };
       }
+      
+      // 验证 token 是否有效
+      console.log('验证 token 有效性...');
+      const authCheck = await dispatch('auth/checkAuthStatus', null, { root: true });
+      if (!authCheck) {
+        console.log('Token 验证失败，跳过 Socket 连接');
+        return { success: false, message: 'Token 无效' };
+      }
+      
+      console.log('开始建立 Socket 连接...');
       
       // 动态导入 socket.io-client
       const { io } = await import('socket.io-client');
@@ -80,7 +95,10 @@ const actions = {
         },
         transports: ['websocket', 'polling'],
         timeout: 10000,
-        forceNew: true
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: 3,
+        reconnectionDelay: 1000
       });
       
       commit('SET_SOCKET', socket);
@@ -156,7 +174,25 @@ const actions = {
     // 连接错误
     socket.on('connect_error', (error) => {
       console.error('Socket 连接错误:', error);
-      commit('SET_CONNECTION_ERROR', error.message);
+      
+      // 检查是否是认证错误
+      if (error.message && error.message.includes('认证')) {
+        commit('SET_CONNECTION_ERROR', '认证失败');
+        
+        // 尝试刷新 token
+        dispatch('auth/refreshToken', null, { root: true }).then((result) => {
+          if (result && result.success) {
+            console.log('Token 刷新成功，重新连接 Socket');
+            dispatch('reconnect');
+          } else {
+            console.log('Token 刷新失败，清除登录状态');
+            dispatch('auth/logout', null, { root: true });
+          }
+        });
+      } else {
+        commit('SET_CONNECTION_ERROR', error.message || 'Socket 连接失败');
+      }
+      
       commit('SET_CONNECTED', false);
       commit('chat/SET_CONNECTED', false, { root: true });
     });
@@ -166,8 +202,18 @@ const actions = {
       console.error('Socket 认证错误:', error);
       commit('SET_CONNECTION_ERROR', '认证失败');
       
-      // 认证失败，清除登录状态
-      dispatch('auth/logout', null, { root: true });
+      // 认证失败，尝试刷新 token
+      dispatch('auth/refreshToken', null, { root: true }).then((result) => {
+        if (result && result.success) {
+          // Token 刷新成功，重新连接
+          console.log('Token 刷新成功，重新连接 Socket');
+          dispatch('reconnect');
+        } else {
+          // Token 刷新失败，清除登录状态
+          console.log('Token 刷新失败，清除登录状态');
+          dispatch('auth/logout', null, { root: true });
+        }
+      });
     });
     
     // 新消息

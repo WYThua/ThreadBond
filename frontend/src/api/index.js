@@ -107,8 +107,12 @@ api.interceptors.response.use(
       }
     }
     
-    // 使用错误码转换器获取友好的错误消息
-    const friendlyMessage = errorCodeTranslator.translateBusinessError(status, errorInfo.message);
+    // 检查错误消息是否已经是中文，如果是则直接使用
+    const hasChinese = /[\u4e00-\u9fa5]/.test(errorInfo.message);
+    const friendlyMessage = hasChinese 
+      ? errorInfo.message 
+      : errorCodeTranslator.translateBusinessError(status, errorInfo.message);
+    
     Toast.fail(friendlyMessage);
     
     // 创建新的错误对象，隐藏技术状态码
