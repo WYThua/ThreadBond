@@ -9,6 +9,7 @@ import {
 } from '../types/clue';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { chatService } from './chatService';
 
 export class ClueService {
   private clueRepository: ClueRepository;
@@ -172,20 +173,25 @@ export class ClueService {
     // 验证答案
     const isCorrect = await this.verifyAnswer(data.answer, clue.solution);
 
-    // 记录解密尝试
-    await this.clueRepository.createDecryptionAttempt(userId, clueId, {
-      ...data,
-      isCorrect,
-      attemptNumber
-    });
-
+    // 如果解密成功，先创建聊天房间
+    let chatRoomId: string | undefined;
     if (isCorrect) {
       // 增加成功解密计数
       await this.clueRepository.incrementSuccessfulDecryptions(clueId);
 
-      // 创建聊天房间（这里先返回占位符，实际实现在聊天服务中）
-      const chatRoomId = await this.createChatRoom(userId, clue.creatorId, clueId);
+      // 创建聊天房间（解密成功后自动创建）
+      chatRoomId = await this.createChatRoom(userId, clue.creatorId, clueId);
+    }
 
+    // 记录解密尝试
+    await this.clueRepository.createDecryptionAttempt(userId, clueId, {
+      ...data,
+      isCorrect,
+      attemptNumber,
+      chatRoomCreated: chatRoomId
+    });
+
+    if (isCorrect) {
       return {
         success: true,
         message: '恭喜！解密成功！',
@@ -355,12 +361,19 @@ export class ClueService {
   }
 
   /**
-   * 创建聊天房间（占位符实现）
+   * 创建聊天房间（解密成功后自动创建）
    */
   private async createChatRoom(userId: string, creatorId: string, clueId: string): Promise<string> {
-    // 这里应该调用聊天服务来创建房间
-    // 暂时返回一个占位符ID
-    return `chat_${userId}_${creatorId}_${clueId}_${Date.now()}`;
+    try {
+      // 调用聊天服务创建房间
+      const chatRoom = await chatService.createChatRoom(userId, creatorId, clueId);
+      return chatRoom.id;
+    } catch (error) {
+      console.error('创建聊天房间失败:', error);
+      // 即使创建聊天房间失败，也不影响解密成功的结果
+      // 返回一个占位符ID，用户可以稍后重试
+      return '';
+    }
   }
 
   /**

@@ -1,4 +1,14 @@
-// 聊天状态管理
+import {
+  getChatRooms,
+  getChatRoomById,
+  getChatHistory,
+  sendMessage as sendMessageAPI,
+  markMessagesAsRead,
+  endChat,
+  revealIdentity,
+  deleteChatRoom
+} from '@/api/chat';
+
 const state = {
   // 聊天房间列表
   chatRooms: [],
@@ -9,23 +19,26 @@ const state = {
   // 当前房间的消息列表
   messages: [],
   
+  // 消息加载状态
+  messagesLoading: false,
+  
+  // 是否还有更多消息
+  hasMoreMessages: true,
+  
   // 未读消息数量
   unreadCount: 0,
   
   // 在线用户列表
   onlineUsers: [],
   
-  // 正在输入的用户
+  // 正在输入的用户列表
   typingUsers: [],
   
-  // 加载状态
-  loading: false,
+  // Socket 连接状态
+  connected: false,
   
-  // 发送消息状态
-  sending: false,
-  
-  // 连接状态
-  connected: false
+  // 临时消息（发送中的消息）
+  tempMessages: []
 };
 
 const mutations = {
@@ -36,17 +49,17 @@ const mutations = {
   
   // 添加聊天房间
   ADD_CHAT_ROOM(state, room) {
-    const existingIndex = state.chatRooms.findIndex(r => r.id === room.id);
-    if (existingIndex !== -1) {
-      state.chatRooms.splice(existingIndex, 1, room);
-    } else {
+    const index = state.chatRooms.findIndex(r => r.id === room.id);
+    if (index === -1) {
       state.chatRooms.unshift(room);
+    } else {
+      state.chatRooms.splice(index, 1, room);
     }
   },
   
   // 更新聊天房间
   UPDATE_CHAT_ROOM(state, { roomId, updates }) {
-    const index = state.chatRooms.findIndex(room => room.id === roomId);
+    const index = state.chatRooms.findIndex(r => r.id === roomId);
     if (index !== -1) {
       state.chatRooms.splice(index, 1, {
         ...state.chatRooms[index],
@@ -54,17 +67,33 @@ const mutations = {
       });
     }
     
-    // 如果是当前房间，也要更新
+    // 如果是当前房间，也更新当前房间
     if (state.currentRoom && state.currentRoom.id === roomId) {
-      state.currentRoom = { ...state.currentRoom, ...updates };
+      state.currentRoom = {
+        ...state.currentRoom,
+        ...updates
+      };
+    }
+  },
+  
+  // 删除聊天房间
+  REMOVE_CHAT_ROOM(state, roomId) {
+    const index = state.chatRooms.findIndex(r => r.id === roomId);
+    if (index !== -1) {
+      state.chatRooms.splice(index, 1);
     }
   },
   
   // 设置当前聊天房间
   SET_CURRENT_ROOM(state, room) {
     state.currentRoom = room;
-    // 清空之前的消息
+  },
+  
+  // 清除当前聊天房间
+  CLEAR_CURRENT_ROOM(state) {
+    state.currentRoom = null;
     state.messages = [];
+    state.hasMoreMessages = true;
   },
   
   // 设置消息列表
@@ -74,28 +103,47 @@ const mutations = {
   
   // 添加消息
   ADD_MESSAGE(state, message) {
-    state.messages.push(message);
+    // 检查消息是否已存在
+    const exists = state.messages.some(m => m.id === message.id);
+    if (!exists) {
+      state.messages.push(message);
+    }
     
-    // 更新房间的最后消息时间
-    if (state.currentRoom) {
-      state.currentRoom.lastMessageAt = message.sentAt;
+    // 移除对应的临时消息
+    if (message.tempId) {
+      const tempIndex = state.tempMessages.findIndex(m => m.tempId === message.tempId);
+      if (tempIndex !== -1) {
+        state.tempMessages.splice(tempIndex, 1);
+      }
     }
   },
   
-  // 添加多条消息（用于历史消息加载）
-  ADD_MESSAGES(state, messages) {
+  // 添加临时消息
+  ADD_TEMP_MESSAGE(state, message) {
+    state.tempMessages.push(message);
+  },
+  
+  // 移除临时消息
+  REMOVE_TEMP_MESSAGE(state, tempId) {
+    const index = state.tempMessages.findIndex(m => m.tempId === tempId);
+    if (index !== -1) {
+      state.tempMessages.splice(index, 1);
+    }
+  },
+  
+  // 批量添加消息（用于加载历史消息）
+  PREPEND_MESSAGES(state, messages) {
     state.messages = [...messages, ...state.messages];
   },
   
-  // 更新消息状态
-  UPDATE_MESSAGE(state, { messageId, updates }) {
-    const index = state.messages.findIndex(msg => msg.id === messageId);
-    if (index !== -1) {
-      state.messages.splice(index, 1, {
-        ...state.messages[index],
-        ...updates
-      });
-    }
+  // 设置消息加载状态
+  SET_MESSAGES_LOADING(state, loading) {
+    state.messagesLoading = loading;
+  },
+  
+  // 设置是否还有更多消息
+  SET_HAS_MORE_MESSAGES(state, hasMore) {
+    state.hasMoreMessages = hasMore;
   },
   
   // 设置未读消息数量
@@ -108,313 +156,332 @@ const mutations = {
     state.unreadCount += 1;
   },
   
-  // 清除特定房间的未读数量
-  CLEAR_ROOM_UNREAD(state, roomId) {
-    const room = state.chatRooms.find(r => r.id === roomId);
-    if (room) {
-      room.unreadCount = 0;
-    }
-  },
-  
-  // 设置在线用户
-  SET_ONLINE_USERS(state, users) {
-    state.onlineUsers = users;
+  // 清除未读消息数量
+  CLEAR_UNREAD_COUNT(state) {
+    state.unreadCount = 0;
   },
   
   // 添加在线用户
   ADD_ONLINE_USER(state, user) {
-    if (!state.onlineUsers.find(u => u.id === user.id)) {
+    const exists = state.onlineUsers.some(u => u.userId === user.userId);
+    if (!exists) {
       state.onlineUsers.push(user);
     }
   },
   
   // 移除在线用户
   REMOVE_ONLINE_USER(state, userId) {
-    state.onlineUsers = state.onlineUsers.filter(u => u.id !== userId);
-  },
-  
-  // 设置正在输入的用户
-  SET_TYPING_USERS(state, users) {
-    state.typingUsers = users;
+    const index = state.onlineUsers.findIndex(u => u.userId === userId);
+    if (index !== -1) {
+      state.onlineUsers.splice(index, 1);
+    }
   },
   
   // 添加正在输入的用户
   ADD_TYPING_USER(state, user) {
-    if (!state.typingUsers.find(u => u.id === user.id)) {
+    const exists = state.typingUsers.some(u => u.id === user.id);
+    if (!exists) {
       state.typingUsers.push(user);
     }
   },
   
   // 移除正在输入的用户
   REMOVE_TYPING_USER(state, userId) {
-    state.typingUsers = state.typingUsers.filter(u => u.id !== userId);
-  },
-  
-  // 设置加载状态
-  SET_LOADING(state, loading) {
-    state.loading = loading;
-  },
-  
-  // 设置发送状态
-  SET_SENDING(state, sending) {
-    state.sending = sending;
+    const index = state.typingUsers.findIndex(u => u.id === userId);
+    if (index !== -1) {
+      state.typingUsers.splice(index, 1);
+    }
   },
   
   // 设置连接状态
   SET_CONNECTED(state, connected) {
     state.connected = connected;
-  },
-  
-  // 清除聊天数据
-  CLEAR_CHAT_DATA(state) {
-    state.chatRooms = [];
-    state.currentRoom = null;
-    state.messages = [];
-    state.unreadCount = 0;
-    state.onlineUsers = [];
-    state.typingUsers = [];
   }
 };
 
 const actions = {
   // 获取聊天房间列表
   async fetchChatRooms({ commit }) {
-    commit('SET_LOADING', true);
-    
     try {
-      // 这里应该调用获取聊天房间的 API
-      // const response = await api.getChatRooms();
-      
-      // 暂时使用模拟数据
-      const mockRooms = [
-        {
-          id: 'room-1',
-          participant1: {
-            id: 'user-1',
-            displayName: '神秘探索者',
-            avatarUrl: '/avatars/default-1.png'
-          },
-          participant2: {
-            id: 'user-2',
-            displayName: '智慧寻宝者',
-            avatarUrl: '/avatars/default-2.png'
-          },
-          clue: {
-            id: 'clue-1',
-            title: '城市中的秘密花园'
-          },
-          lastMessage: {
-            content: { text: '你好！很高兴认识你' },
-            sentAt: new Date().toISOString()
-          },
-          unreadCount: 2,
-          isActive: true,
-          identityRevealed: false
-        }
-      ];
-      
-      commit('SET_CHAT_ROOMS', mockRooms);
-      
-      // 计算总未读数量
-      const totalUnread = mockRooms.reduce((sum, room) => sum + (room.unreadCount || 0), 0);
-      commit('SET_UNREAD_COUNT', totalUnread);
-      
-      return { success: true };
-      
+      const response = await getChatRooms();
+      if (response.success) {
+        commit('SET_CHAT_ROOMS', response.data || []);
+        
+        // 计算未读消息总数
+        const unreadCount = (response.data || []).reduce((sum, room) => {
+          return sum + (room.unreadCount || 0);
+        }, 0);
+        commit('SET_UNREAD_COUNT', unreadCount);
+        
+        return { success: true, data: response.data };
+      }
+      return { success: false, message: response.message };
     } catch (error) {
-      console.error('获取聊天房间失败:', error);
-      return { success: false, message: error.message || '获取聊天房间失败' };
-    } finally {
-      commit('SET_LOADING', false);
+      console.error('获取聊天房间列表失败:', error);
+      return { success: false, message: error.message || '获取聊天房间列表失败' };
     }
   },
   
-  // 获取聊天历史
-  async fetchChatHistory({ commit }, { roomId, page = 1, pageSize = 50 }) {
-    commit('SET_LOADING', true);
-    
+  // 进入聊天房间
+  async enterChatRoom({ commit, dispatch }, roomId) {
     try {
-      // 这里应该调用获取聊天历史的 API
-      // const response = await api.getChatHistory(roomId, { page, pageSize });
-      
-      // 暂时使用模拟数据
-      const mockMessages = [
-        {
-          id: 'msg-1',
-          content: { text: '你好！很高兴认识你' },
-          type: 'TEXT',
-          senderId: 'user-2',
-          senderName: '智慧寻宝者',
-          sentAt: new Date(Date.now() - 3600000).toISOString(),
-          readAt: new Date().toISOString()
-        },
-        {
-          id: 'msg-2',
-          content: { text: '你好！我也很高兴能和你聊天' },
-          type: 'TEXT',
-          senderId: 'user-1',
-          senderName: '神秘探索者',
-          sentAt: new Date(Date.now() - 1800000).toISOString(),
-          readAt: new Date().toISOString()
-        }
-      ];
-      
-      if (page === 1) {
-        commit('SET_MESSAGES', mockMessages);
-      } else {
-        commit('ADD_MESSAGES', mockMessages);
+      // 获取房间详情
+      const response = await getChatRoomById(roomId);
+      if (!response.success) {
+        return { success: false, message: response.message };
       }
       
-      return { success: true, hasMore: false };
+      commit('SET_CURRENT_ROOM', response.data);
       
+      // 加载聊天历史
+      await dispatch('loadChatHistory', roomId);
+      
+      // 加入 Socket.IO 房间
+      dispatch('socket/joinChatRoom', roomId, { root: true });
+      
+      // 标记消息为已读
+      await dispatch('markAsRead', roomId);
+      
+      return { success: true, data: response.data };
     } catch (error) {
-      console.error('获取聊天历史失败:', error);
-      return { success: false, message: error.message || '获取聊天历史失败' };
-    } finally {
-      commit('SET_LOADING', false);
-    }
-  },
-  
-  // 发送消息
-  async sendMessage({ commit, state }, { roomId, content, type = 'TEXT' }) {
-    if (!state.connected) {
-      return { success: false, message: '连接已断开，请重新连接' };
-    }
-    
-    commit('SET_SENDING', true);
-    
-    try {
-      // 创建临时消息对象
-      const tempMessage = {
-        id: 'temp-' + Date.now(),
-        content,
-        type,
-        senderId: 'current-user', // 应该从用户状态获取
-        senderName: '我',
-        sentAt: new Date().toISOString(),
-        status: 'sending'
-      };
-      
-      // 立即添加到消息列表
-      commit('ADD_MESSAGE', tempMessage);
-      
-      // 这里应该通过 Socket.IO 发送消息
-      // socket.emit('send_message', { roomId, content, type });
-      
-      // 暂时模拟发送成功
-      setTimeout(() => {
-        commit('UPDATE_MESSAGE', {
-          messageId: tempMessage.id,
-          updates: {
-            id: 'msg-' + Date.now(),
-            status: 'sent'
-          }
-        });
-      }, 1000);
-      
-      return { success: true };
-      
-    } catch (error) {
-      console.error('发送消息失败:', error);
-      return { success: false, message: error.message || '发送消息失败' };
-    } finally {
-      commit('SET_SENDING', false);
-    }
-  },
-  
-  // 加入聊天房间
-  async joinChatRoom({ commit }, roomId) {
-    try {
-      // 这里应该通过 Socket.IO 加入房间
-      // socket.emit('join_chat_room', { roomId });
-      
-      // 清除该房间的未读数量
-      commit('CLEAR_ROOM_UNREAD', roomId);
-      
-      return { success: true };
-      
-    } catch (error) {
-      console.error('加入聊天房间失败:', error);
-      return { success: false, message: error.message || '加入聊天房间失败' };
+      console.error('进入聊天房间失败:', error);
+      return { success: false, message: error.message || '进入聊天房间失败' };
     }
   },
   
   // 离开聊天房间
-  async leaveChatRoom({ commit }, roomId) {
-    try {
-      // 这里应该通过 Socket.IO 离开房间
-      // socket.emit('leave_chat_room', { roomId });
+  leaveChatRoom({ commit, dispatch, state }) {
+    if (state.currentRoom) {
+      // 离开 Socket.IO 房间
+      dispatch('socket/leaveChatRoom', state.currentRoom.id, { root: true });
       
+      // 清除当前房间
+      commit('CLEAR_CURRENT_ROOM');
+    }
+  },
+  
+  // 加载聊天历史
+  async loadChatHistory({ commit, state }, roomId) {
+    if (state.messagesLoading) {
+      return;
+    }
+    
+    commit('SET_MESSAGES_LOADING', true);
+    
+    try {
+      const params = {
+        limit: 50
+      };
+      
+      // 如果已有消息，加载更早的消息
+      if (state.messages.length > 0) {
+        params.before = state.messages[0].sentAt;
+      }
+      
+      const response = await getChatHistory(roomId, params);
+      
+      if (response.success) {
+        const messages = response.data || [];
+        
+        if (messages.length === 0) {
+          commit('SET_HAS_MORE_MESSAGES', false);
+        } else {
+          if (state.messages.length === 0) {
+            commit('SET_MESSAGES', messages);
+          } else {
+            commit('PREPEND_MESSAGES', messages);
+          }
+        }
+        
+        return { success: true, data: messages };
+      }
+      
+      return { success: false, message: response.message };
+    } catch (error) {
+      console.error('加载聊天历史失败:', error);
+      return { success: false, message: error.message || '加载聊天历史失败' };
+    } finally {
+      commit('SET_MESSAGES_LOADING', false);
+    }
+  },
+  
+  // 发送消息
+  async sendMessage({ commit, dispatch, state, rootState }, { content, type = 'TEXT' }) {
+    if (!state.currentRoom) {
+      return { success: false, message: '未进入聊天房间' };
+    }
+    
+    // 生成临时ID
+    const tempId = `temp_${Date.now()}_${Math.random()}`;
+    
+    // 创建临时消息
+    const tempMessage = {
+      tempId,
+      content,
+      type,
+      senderId: rootState.auth.user?.anonymousId,
+      senderName: rootState.auth.user?.displayName || '我',
+      sentAt: new Date(),
+      roomId: state.currentRoom.id,
+      sending: true
+    };
+    
+    // 添加到临时消息列表
+    commit('ADD_TEMP_MESSAGE', tempMessage);
+    
+    // 通过 Socket.IO 发送
+    const socketResult = dispatch('socket/sendMessage', {
+      roomId: state.currentRoom.id,
+      content,
+      type,
+      tempId
+    }, { root: true });
+    
+    if (socketResult.success) {
+      return { success: true, tempId };
+    }
+    
+    // 如果 Socket 不可用，使用 HTTP API
+    try {
+      const response = await sendMessageAPI(state.currentRoom.id, { content, type });
+      
+      if (response.success) {
+        // 移除临时消息
+        commit('REMOVE_TEMP_MESSAGE', tempId);
+        
+        // 添加真实消息
+        commit('ADD_MESSAGE', response.data);
+        
+        return { success: true, data: response.data };
+      }
+      
+      // 发送失败，移除临时消息
+      commit('REMOVE_TEMP_MESSAGE', tempId);
+      
+      return { success: false, message: response.message };
+    } catch (error) {
+      console.error('发送消息失败:', error);
+      
+      // 移除临时消息
+      commit('REMOVE_TEMP_MESSAGE', tempId);
+      
+      return { success: false, message: error.message || '发送消息失败' };
+    }
+  },
+  
+  // 标记消息为已读
+  async markAsRead({ commit }, roomId) {
+    try {
+      await markMessagesAsRead(roomId);
+      commit('CLEAR_UNREAD_COUNT');
       return { success: true };
-      
     } catch (error) {
-      console.error('离开聊天房间失败:', error);
-      return { success: false, message: error.message || '离开聊天房间失败' };
+      console.error('标记消息已读失败:', error);
+      return { success: false };
     }
   },
   
-  // 开始输入
-  startTyping({ state }, roomId) {
-    if (state.connected) {
-      // socket.emit('typing_start', { roomId });
+  // 结束聊天
+  async endChat({ commit, state }) {
+    if (!state.currentRoom) {
+      return { success: false, message: '未进入聊天房间' };
     }
-  },
-  
-  // 停止输入
-  stopTyping({ state }, roomId) {
-    if (state.connected) {
-      // socket.emit('typing_stop', { roomId });
-    }
-  },
-  
-  // 刷新未读数量
-  async refreshUnreadCount({ commit }) {
+    
     try {
-      // 这里应该调用获取未读数量的 API
-      // const response = await api.getUnreadCount();
+      const response = await endChat(state.currentRoom.id);
       
-      // 暂时使用模拟数据
-      commit('SET_UNREAD_COUNT', 0);
+      if (response.success) {
+        // 更新房间状态
+        commit('UPDATE_CHAT_ROOM', {
+          roomId: state.currentRoom.id,
+          updates: { isActive: false }
+        });
+        
+        return { success: true };
+      }
       
+      return { success: false, message: response.message };
     } catch (error) {
-      console.error('刷新未读数量失败:', error);
+      console.error('结束聊天失败:', error);
+      return { success: false, message: error.message || '结束聊天失败' };
+    }
+  },
+  
+  // 身份揭示
+  async revealIdentity({ commit, state }) {
+    if (!state.currentRoom) {
+      return { success: false, message: '未进入聊天房间' };
+    }
+    
+    try {
+      const response = await revealIdentity(state.currentRoom.id);
+      
+      if (response.success) {
+        // 更新房间状态
+        commit('UPDATE_CHAT_ROOM', {
+          roomId: state.currentRoom.id,
+          updates: response.data.chatRoom
+        });
+        
+        return { 
+          success: true, 
+          bothRevealed: response.data.bothRevealed 
+        };
+      }
+      
+      return { success: false, message: response.message };
+    } catch (error) {
+      console.error('身份揭示失败:', error);
+      return { success: false, message: error.message || '身份揭示失败' };
+    }
+  },
+  
+  // 删除聊天房间
+  async deleteChatRoom({ commit }, roomId) {
+    try {
+      const response = await deleteChatRoom(roomId);
+      
+      if (response.success) {
+        commit('REMOVE_CHAT_ROOM', roomId);
+        return { success: true };
+      }
+      
+      return { success: false, message: response.message };
+    } catch (error) {
+      console.error('删除聊天房间失败:', error);
+      return { success: false, message: error.message || '删除聊天房间失败' };
     }
   }
 };
 
 const getters = {
-  // 获取聊天房间列表
-  chatRooms: state => state.chatRooms,
+  // 获取所有消息（包括临时消息）
+  allMessages: state => {
+    return [...state.messages, ...state.tempMessages].sort((a, b) => {
+      return new Date(a.sentAt) - new Date(b.sentAt);
+    });
+  },
   
-  // 获取当前聊天房间
-  currentRoom: state => state.currentRoom,
+  // 获取对方用户信息
+  otherUser: (state, getters, rootState) => {
+    if (!state.currentRoom) {
+      return null;
+    }
+    
+    const currentUserId = rootState.auth.user?.anonymousId;
+    
+    if (state.currentRoom.participant1Id === currentUserId) {
+      return state.currentRoom.participant2;
+    } else {
+      return state.currentRoom.participant1;
+    }
+  },
   
-  // 获取消息列表
-  messages: state => state.messages,
+  // 是否有未读消息
+  hasUnread: state => state.unreadCount > 0,
   
-  // 获取未读消息数量
-  unreadCount: state => state.unreadCount,
-  
-  // 获取在线用户
-  onlineUsers: state => state.onlineUsers,
-  
-  // 获取正在输入的用户
-  typingUsers: state => state.typingUsers,
-  
-  // 是否正在加载
-  isLoading: state => state.loading,
-  
-  // 是否正在发送
-  isSending: state => state.sending,
-  
-  // 是否已连接
-  isConnected: state => state.connected,
-  
-  // 获取特定房间的未读数量
-  getRoomUnreadCount: state => roomId => {
-    const room = state.chatRooms.find(r => r.id === roomId);
-    return room ? room.unreadCount || 0 : 0;
-  }
+  // 是否正在输入
+  isTyping: state => state.typingUsers.length > 0
 };
 
 export default {

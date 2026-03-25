@@ -77,6 +77,16 @@ export function setupSocketIO(io: Server) {
       handleTypingStop(socket, data);
     });
 
+    // 消息已读回执
+    socket.on('mark_as_read', async (data) => {
+      await handleMarkAsRead(socket, io, data);
+    });
+
+    // 获取在线状态
+    socket.on('check_user_online', async (data) => {
+      await handleCheckUserOnline(socket, data);
+    });
+
     // 断开连接
     socket.on('disconnect', () => {
       handleUserOffline(socket);
@@ -184,6 +194,19 @@ async function handleSendMessage(socket: AuthenticatedSocket, io: Server, data: 
   try {
     const { roomId, content, type = 'TEXT' } = data;
 
+    // 验证消息内容
+    if (!content || Object.keys(content).length === 0) {
+      socket.emit('error', { message: '消息内容不能为空' });
+      return;
+    }
+
+    // 验证消息类型
+    const validTypes = ['TEXT', 'IMAGE', 'EMOJI', 'AUDIO', 'SYSTEM'];
+    if (!validTypes.includes(type)) {
+      socket.emit('error', { message: '不支持的消息类型' });
+      return;
+    }
+
     // 验证房间权限
     const chatRoom = await prisma.chatRoom.findFirst({
       where: {
@@ -198,6 +221,22 @@ async function handleSendMessage(socket: AuthenticatedSocket, io: Server, data: 
 
     if (!chatRoom) {
       socket.emit('error', { message: '无权限在此房间发送消息' });
+      return;
+    }
+
+    // 根据消息类型验证内容
+    if (type === 'TEXT' && (!content.text || content.text.trim().length === 0)) {
+      socket.emit('error', { message: '文字消息内容不能为空' });
+      return;
+    }
+
+    if (type === 'IMAGE' && !content.imageUrl) {
+      socket.emit('error', { message: '图片消息必须包含图片URL' });
+      return;
+    }
+
+    if (type === 'EMOJI' && !content.emoji) {
+      socket.emit('error', { message: '表情消息必须包含表情' });
       return;
     }
 
@@ -222,15 +261,23 @@ async function handleSendMessage(socket: AuthenticatedSocket, io: Server, data: 
     });
 
     // 缓存最新消息
-    await getRedisService().lPush(`room:messages:${roomId}`, message);
-    
-    // 只保留最近100条消息在缓存中
-    const messageCount = await getRedisService().lRange(`room:messages:${roomId}`, 0, -1);
-    if (messageCount.length > 100) {
-      // 移除多余的消息
-      for (let i = 100; i < messageCount.length; i++) {
-        await getRedisService().lPop(`room:messages:${roomId}`);
+    try {
+      await getRedisService().lPush(`room:messages:${roomId}`, message);
+      
+      // 只保留最近100条消息在缓存中
+      const messageCount = await getRedisService().lRange(`room:messages:${roomId}`, 0, -1);
+      if (messageCount.length > 100) {
+        // 移除多余的消息
+        for (let i = 100; i < messageCount.length; i++) {
+          await getRedisService().lPop(`room:messages:${roomId}`);
+        }
       }
+
+      // 设置缓存过期时间（24小时）
+      await getRedisService().expire(`room:messages:${roomId}`, 86400);
+    } catch (cacheError) {
+      console.error('缓存消息失败:', cacheError);
+      // 不影响消息发送
     }
 
     // 广播消息到房间内所有用户
@@ -240,13 +287,25 @@ async function handleSendMessage(socket: AuthenticatedSocket, io: Server, data: 
       type: message.type,
       senderId: message.senderId,
       senderName: message.sender.displayName,
+      senderAvatar: message.sender.avatarUrl,
       sentAt: message.sentAt,
-      roomId
+      roomId,
+      isEncrypted: message.isEncrypted
+    });
+
+    // 发送确认给发送者
+    socket.emit('message_sent', {
+      id: message.id,
+      tempId: data.tempId, // 客户端临时ID，用于匹配
+      sentAt: message.sentAt
     });
 
   } catch (error) {
     console.error('发送消息失败:', error);
-    socket.emit('error', { message: '发送消息失败' });
+    socket.emit('error', { 
+      message: '发送消息失败',
+      tempId: data.tempId // 返回临时ID，让客户端知道哪条消息失败
+    });
   }
 }
 
@@ -281,4 +340,69 @@ function handleTypingStop(socket: AuthenticatedSocket, data: { roomId: string })
     userId: socket.anonymousId,
     roomId: data.roomId
   });
+}
+
+// 处理消息已读
+async function handleMarkAsRead(socket: AuthenticatedSocket, io: Server, data: { roomId: string; messageIds: string[] }) {
+  try {
+    const { roomId, messageIds } = data;
+
+    if (!messageIds || messageIds.length === 0) {
+      return;
+    }
+
+    // 批量标记消息为已读
+    await prisma.message.updateMany({
+      where: {
+        id: { in: messageIds },
+        roomId,
+        senderId: { not: socket.anonymousId }, // 只能标记别人发送的消息
+        readAt: null
+      },
+      data: {
+        readAt: new Date()
+      }
+    });
+
+    // 通知发送者消息已被阅读
+    socket.to(roomId).emit('messages_read', {
+      roomId,
+      messageIds,
+      readBy: socket.anonymousId,
+      readAt: new Date()
+    });
+
+  } catch (error) {
+    console.error('标记消息已读失败:', error);
+  }
+}
+
+// 检查用户在线状态
+async function handleCheckUserOnline(socket: AuthenticatedSocket, data: { userId: string }) {
+  try {
+    const { userId } = data;
+    const redisClient = getRedisClient();
+    
+    if (!redisClient) {
+      socket.emit('user_online_status', {
+        userId,
+        isOnline: false
+      });
+      return;
+    }
+
+    const onlineData = await getRedisService().get(`user:online:${userId}`);
+    
+    socket.emit('user_online_status', {
+      userId,
+      isOnline: !!onlineData
+    });
+
+  } catch (error) {
+    console.error('检查用户在线状态失败:', error);
+    socket.emit('user_online_status', {
+      userId: data.userId,
+      isOnline: false
+    });
+  }
 }
